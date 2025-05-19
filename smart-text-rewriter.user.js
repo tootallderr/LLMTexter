@@ -1879,4 +1879,63 @@
 
     // Initialize mode cycling
     setupModeCycling();
+
+    // Show mode dropdown for selecting rewrite mode
+    function showModeDropdown(event, element, button) {
+        // Create dropdown if it doesn't exist
+        let dropdown = document.querySelector('.str-mode-dropdown');
+        if (!dropdown) {
+            dropdown = document.createElement('div');
+            dropdown.className = 'str-mode-dropdown';
+            document.body.appendChild(dropdown);
+        }
+        
+        // Clear previous content
+        dropdown.innerHTML = '';
+        
+        // Add header
+        const header = document.createElement('div');
+        header.className = 'str-mode-dropdown-header';
+        header.textContent = 'Select Rewrite Mode';
+        header.style.padding = '8px 12px';
+        header.style.fontWeight = 'bold';
+        header.style.borderBottom = '1px solid #34495e';
+        dropdown.appendChild(header);
+        
+        // Add modes
+        Object.entries(rewriteModes).forEach(([key, mode]) => {
+            const item = document.createElement('div');
+            item.className = 'str-mode-dropdown-item';
+            item.textContent = mode.name;
+            item.setAttribute('data-mode', key);
+            
+            item.addEventListener('click', function() {
+                rewriteText(element, key);
+                dropdown.classList.remove('visible');
+            });
+            
+            dropdown.appendChild(item);
+        });
+        
+        // Position the dropdown near the button
+        const rect = button.getBoundingClientRect();
+        dropdown.style.left = `${rect.left}px`;
+        dropdown.style.top = `${rect.bottom + 5}px`;
+        
+        // Show the dropdown
+        dropdown.classList.add('visible');
+        
+        // Close dropdown when clicking elsewhere
+        const closeDropdown = function(e) {
+            if (!dropdown.contains(e.target) && e.target !== button) {
+                dropdown.classList.remove('visible');
+                document.removeEventListener('click', closeDropdown);
+            }
+        };
+        
+        // Delay adding the event listener to prevent immediate closing
+        setTimeout(() => {
+            document.addEventListener('click', closeDropdown);
+        }, 10);
+    }
 })();
