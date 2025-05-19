@@ -1039,9 +1039,7 @@
                         `${element.tagName}_${Array.from(element.parentNode.children).indexOf(element)}`;
         
         return config.lastUsedModes[elementId] || Object.keys(rewriteModes)[0];
-    }
-
-    // Save last used mode for a specific element
+    }    // Save last used mode for a specific element
     function saveLastUsedMode(element, mode) {
         // Generate a unique identifier for the element
         const elementId = element.id || 
@@ -1050,7 +1048,40 @@
         
         config.lastUsedModes[elementId] = mode;
         GM_setValue('lastUsedModes', config.lastUsedModes);
-    }    // Rewrite text using Ollama API - New fixed implementation
+    }
+    
+    // Generate a unique ID for an element
+    function generateUniqueId(element) {
+        // Create a unique identifier based on element attributes and position
+        const tagName = element.tagName.toLowerCase();
+        const path = [];
+        let currentElem = element;
+        
+        while (currentElem && currentElem !== document.body) {
+            let index = 0;
+            let sibling = currentElem;
+            
+            while (sibling) {
+                if (sibling.nodeType === Node.ELEMENT_NODE) {
+                    index++;
+                }
+                sibling = sibling.previousSibling;
+            }
+            
+            path.unshift(`${currentElem.tagName.toLowerCase()}:nth-child(${index})`);
+            currentElem = currentElem.parentNode;
+        }
+        
+        // Create a hash of the path
+        let hash = 0;
+        const pathStr = path.join(' > ');
+        for (let i = 0; i < pathStr.length; i++) {
+            hash = ((hash << 5) - hash) + pathStr.charCodeAt(i);
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        
+        return `element_${Math.abs(hash)}`;
+    }// Rewrite text using Ollama API - New fixed implementation
     function rewriteText(element, mode) {
         if (!config.enabled || !element) {
             logger.log('Rewrite aborted - script disabled or invalid element');
