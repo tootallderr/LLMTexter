@@ -82,6 +82,10 @@
     };    // Main initialization
     function init() {
         logger.log('Initializing Smart Text Rewriter');
+        console.log('[Smart Text Rewriter] Initializing script...');
+        
+        // Debug mode on by default for troubleshooting
+        config.debug = true;
         
         // Check if script is enabled
         if (!config.enabled) {
@@ -107,11 +111,17 @@
         // Setup context menu
         setupContextMenu();
         
+        // Show prominent notification
+        showNotification('Smart Text Rewriter is starting up! Buttons should appear next to text fields.', 5000);
+        
         // Add rewrite buttons to text fields
         setupRewriteButtons();
         
-        // Detect text input fields
+        // Detect text input fields immediately and repeatedly
         detectTextInputs();
+        
+        // More aggressive repeated detection
+        setInterval(detectTextInputs, 2000); // Check every 2 seconds
         
         // Setup observers for dynamically added elements
         setupObservers();
@@ -119,8 +129,9 @@
         // Fetch available models
         fetchOllamaModels();
         
-        // Shadow DOM traversal to find text inputs in modern web apps
-        setTimeout(traverseShadowDOM, 2000); // Delay to let page load
+        // Shadow DOM traversal to find text inputs in modern web apps - run more frequently
+        setTimeout(traverseShadowDOM, 1000); // First check after 1 second
+        setInterval(traverseShadowDOM, 3000); // Keep checking periodically
         
         // Register smart reply keyboard shortcut
         document.addEventListener('keydown', function(e) {
@@ -133,7 +144,11 @@
             }
         });
         
+        // Create a debug button that's always visible
+        createDebugButton();
+        
         logger.log('Initialization complete');
+        console.log('[Smart Text Rewriter] Initialization complete');
     }// Add CSS styles
     function addStyles() {
         GM_addStyle(`
@@ -1290,8 +1305,7 @@
         }
         
         return null;
-    }
-      // Add a rewrite button for a text input
+    }    // Add a rewrite button for a text input
     function addRewriteButton(element) {
         if (!element || !config.enabled) return;
         
@@ -1313,21 +1327,33 @@
         button.innerHTML = '✍️<span class="str-tooltip">Smart Rewrite</span>';
         button.setAttribute('data-for', elementId);
         
-        // Make the button more visible
-        button.style.position = 'absolute';
-        button.style.zIndex = '9999';
-        button.style.background = '#e74c3c';  // Red to make it stand out
+        // Make the button VERY visible - bigger and more prominent
+        button.style.position = 'fixed'; // Changed from absolute to fixed
+        button.style.zIndex = '999999'; // Increased z-index
+        button.style.background = 'red'; // Pure red to be more noticeable
         button.style.color = 'white';
-        button.style.fontSize = '20px';
-        button.style.width = '40px';
-        button.style.height = '40px';
+        button.style.fontSize = '24px'; // Increased size
+        button.style.width = '50px'; // Increased width
+        button.style.height = '50px'; // Increased height
         button.style.borderRadius = '50%';
-        button.style.border = '2px solid white';
-        button.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+        button.style.border = '3px solid yellow'; // Bold yellow border
+        button.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)'; // Stronger shadow
         button.style.cursor = 'pointer';
         button.style.display = 'flex';
         button.style.alignItems = 'center';
         button.style.justifyContent = 'center';
+        button.style.animation = 'pulse-animation 2s infinite'; // Add animation
+        
+        // Add pulsing animation
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            @keyframes pulse-animation {
+                0% { transform: scale(1); }
+                50% { transform: scale(1.1); }
+                100% { transform: scale(1); }
+            }
+        `;
+        document.head.appendChild(styleSheet);
         
         // Position the button
         positionRewriteButton(button, element);
@@ -1349,35 +1375,73 @@
         
         // Add the button to the document
         document.body.appendChild(button);
-        logger.log('Added button to element', element);
+        console.log('[Smart Text Rewriter] Added button to element', element);
+        showNotification('Rewrite button added! Click it to rewrite text.', 3000);
         
-        // Add a blink animation to draw attention to the button
-        button.animate([
-            { transform: 'scale(1)', opacity: 1 },
-            { transform: 'scale(1.2)', opacity: 1 },
-            { transform: 'scale(1)', opacity: 1 }
-        ], {
-            duration: 600,
-            iterations: 2
+        // Log debug information
+        logger.log('Button created for element:', element);
+        logger.log('Button properties:', {
+            position: button.style.position,
+            zIndex: button.style.zIndex,
+            background: button.style.background,
+            dimensions: `${button.style.width}x${button.style.height}`
         });
-    }
-      // Position a rewrite button next to its text input
+        
+        // Debug notification
+        showNotification('Debug: Button should be visible now!', 2000);
+    }    // Position a rewrite button next to its text input
     function positionRewriteButton(button, element) {
         if (!element || !button) return;
         
-        const rect = element.getBoundingClientRect();
-        const scrollX = window.scrollX || window.pageXOffset;
-        const scrollY = window.scrollY || window.pageYOffset;
-        
-        // Position to the right of the input with absolute positioning
-        button.style.left = `${rect.right + scrollX + 10}px`;
-        button.style.top = `${rect.top + scrollY + (rect.height/2) - 20}px`;
-        
-        // Make sure the button is in the document
-        if (!button.parentNode) {
-            document.body.appendChild(button);
-            logger.log('Added button to document body');
-            showNotification('Rewrite button added! Click it to rewrite text.', 1500);
+        try {
+            const rect = element.getBoundingClientRect();
+            const scrollX = window.scrollX || window.pageXOffset;
+            const scrollY = window.scrollY || window.pageYOffset;
+            
+            // Fixed positioning in viewport coordinates
+            button.style.position = 'fixed';
+            
+            // Position to the right of the input with some spacing
+            button.style.left = `${rect.right + 20}px`;
+            button.style.top = `${rect.top + (rect.height/2) - 25}px`;
+            
+            // Alternative position if near the edge of the viewport
+            if (rect.right + 70 > window.innerWidth) {
+                // Move to the left of the input if near right edge
+                button.style.left = `${rect.left - 70}px`;
+            }
+            
+            // Make sure the button is in the document
+            if (!button.parentNode) {
+                document.body.appendChild(button);
+                console.log('[Smart Text Rewriter] Added button to document body');
+                showNotification('Rewrite button added! Click it to rewrite text.', 2000);
+            }
+            
+            // Debug info
+            console.log('[Smart Text Rewriter] Button positioned at:', {
+                left: button.style.left,
+                top: button.style.top,
+                elementRect: {
+                    left: rect.left,
+                    right: rect.right,
+                    top: rect.top,
+                    bottom: rect.bottom,
+                    width: rect.width,
+                    height: rect.height
+                }
+            });
+        } catch (error) {
+            console.error('[Smart Text Rewriter] Error positioning button:', error);
+            
+            // Fallback position in case of error
+            button.style.top = '100px';
+            button.style.left = '100px';
+            
+            // Make sure the button is in the document even if there's an error
+            if (!button.parentNode) {
+                document.body.appendChild(button);
+            }
         }
     }
     
@@ -1551,8 +1615,7 @@
                 postEditor: '.submit-page textarea',
                 contextPost: '.sitetable.nestedlisting .entry .md'
             },
-            extractContext: function() {
-                // Extract post or comment being replied to
+            extractContext: function() {                // Extract post or comment being replied to
                 const contextPosts = document.querySelectorAll(this.selectors.contextPost);
                 if (contextPosts.length > 0) {
                     // Get the last one (direct parent)
@@ -1937,5 +2000,51 @@
         setTimeout(() => {
             document.addEventListener('click', closeDropdown);
         }, 10);
+    }
+
+    // Create a debug button that's always visible in the corner
+    function createDebugButton() {
+        const button = document.createElement('button');
+        button.textContent = 'STR Debug';
+        button.style.position = 'fixed';
+        button.style.bottom = '20px';
+        button.style.right = '20px';
+        button.style.zIndex = '999999';
+        button.style.background = 'blue';
+        button.style.color = 'white';
+        button.style.padding = '10px 15px';
+        button.style.borderRadius = '5px';
+        button.style.border = '2px solid white';
+        button.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
+        button.style.cursor = 'pointer';
+        button.style.fontSize = '16px';
+        
+        button.addEventListener('click', function() {
+            // Show current status of the script
+            const status = {
+                enabled: config.enabled,
+                buttonsAdded: document.querySelectorAll('.str-rewrite-button').length,
+                textInputsFound: document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]').length,
+                settingsPanelVisible: config.settingsPanelVisible,
+                selectedModel: config.selectedModel,
+                endpoint: config.ollamaEndpoint
+            };
+            
+            console.log('[Smart Text Rewriter] Status:', status);
+            
+            // Force add buttons to all text inputs
+            const allInputs = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
+            
+            showNotification(`Found ${allInputs.length} text inputs. Adding buttons...`, 3000);
+            
+            allInputs.forEach(input => {
+                addRewriteButton(input);
+            });
+            
+            // Show notification
+            showNotification(`Debug info: Found ${allInputs.length} text inputs, added ${document.querySelectorAll('.str-rewrite-button').length} buttons`, 5000);
+        });
+        
+        document.body.appendChild(button);
     }
 })();
