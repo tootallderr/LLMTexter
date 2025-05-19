@@ -1,6 +1,4 @@
-# Smart Text Rewriter - Browser Extension
-
-![Smart Text Rewriter Logo](https://raw.githubusercontent.com/username/smart-text-rewriter/main/assets/logo.png)
+# LLMTexter - Smart Text Rewriter
 
 > A powerful browser extension that enhances text fields with AI-powered rewriting capabilities using local LLMs via Ollama.
 
@@ -18,7 +16,7 @@
 1. Install [Tampermonkey](https://www.tampermonkey.net/) browser extension
 2. Install [Ollama](https://ollama.ai/) on your computer
 3. Download a language model in Ollama (recommended: `llama3`)
-4. Click [here](#) to install the Smart Text Rewriter script
+4. Install the Smart Text Rewriter script
 5. Make sure Ollama is running before using the script
 
 ## Usage
@@ -73,6 +71,14 @@ Access the settings panel by pressing `Alt+R` or through the Tampermonkey menu.
 - **No rewrite button appears**: Make sure the script is enabled in Tampermonkey
 - **Rewriting fails**: Check if Ollama is running at the configured endpoint
 - **Slow responses**: Try using a smaller language model in Ollama
+
+## Roadmap
+
+See the [Roadmap](Roadmap.md) file for planned features and improvements including:
+- UI Improvements (Dark Mode, Accessibility)
+- Performance Optimizations
+- Advanced LLM Integration
+- Content Creation Tools
 
 ## Privacy
 
