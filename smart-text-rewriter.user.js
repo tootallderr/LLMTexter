@@ -23,12 +23,12 @@
         selectedModel: GM_getValue('selectedModel', 'llama3'),
         keyboardShortcut: GM_getValue('keyboardShortcut', 'Alt+R'),
         quickRewriteShortcut: GM_getValue('quickRewriteShortcut', 'Alt+Shift+R'),
-        models: GM_getValue('models', []),
-        lastFetchedModels: GM_getValue('lastFetchedModels', 0),
+        models: GM_getValue('models', []),        lastFetchedModels: GM_getValue('lastFetchedModels', 0),
         debug: GM_getValue('debug', false),
         settingsPanelPosition: GM_getValue('settingsPanelPosition', { x: 10, y: 10 }),
         settingsPanelVisible: false,
         lastUsedModes: GM_getValue('lastUsedModes', {}), // Store by element id or path
+        originalText: {}, // Store original text for undo feature
     };
 
     // Rewrite modes
@@ -60,6 +60,75 @@
         'adult': {
             name: '🌶️ Adult / Explicit',
             prompt: 'Rewrite this text with adult/explicit content. Use provocative language and mature themes.',
+        },
+        'weed': {
+            name: '🌿 Stoned',
+            prompt: 'Rewrite this text as if the person is high on marijuana. Use relaxed language, incomplete thoughts, philosophical tangents, food references, and stoner slang. Add "like", "man", "dude", pauses, and occasional deep but confused insights.',
+        },
+        // New modes below
+        'humorous': {
+            name: '😂 Satirical Humor',
+            prompt: 'Completely restructure this text to be satirically funny. Use irony, exaggeration, and unexpected twists. Make it genuinely humorous with clever wordplay and absurd but relatable observations.',
+        },
+        'factcheck': {
+            name: '✅ Fact Check',
+            prompt: 'Carefully analyze this text for factual accuracy. If any statements appear incorrect or misleading, rewrite them to be factually accurate. Maintain the original intent but prioritize truth and accuracy over style.',
+        },
+        'shakespeare': {
+            name: '🎭 Shakespeare',
+            prompt: 'Rewrite this text as if William Shakespeare wrote it. Use Early Modern English, iambic pentameter when possible, and Shakespearean vocabulary. Include thees, thous, and poetic metaphors.',
+        },
+        'pirate': {
+            name: '🏴‍☠️ Pirate',
+            prompt: 'Rewrite this text as a pirate would speak. Use phrases like "Arr", "matey", "shiver me timbers", references to the sea, treasure, and nautical elements.',
+        },
+        'yoda': {
+            name: '👽 Yoda',
+            prompt: 'Rewrite this text in Yoda\'s style from Star Wars. Rearrange sentence structure with verb-object-subject pattern. Use wise, cryptic phrasing and his characteristic speech pattern.',
+        },
+        'valley': {
+            name: '💅 Valley Girl',
+            prompt: 'Rewrite this text using excessive corporate buzzwords and business jargon. Use phrases like "synergy", "leverage", "circle back", "touch base", "value-add", and other office speak.',
+        },
+        'poetic': {
+            name: '🌹 Poetic',
+            prompt: 'Rewrite this text as beautiful poetry. Use vivid imagery, metaphors, and elegant language. Make it emotionally resonant and artistically expressive.',
+        },
+        'victorian': {
+            name: '🎩 Victorian Era',
+            prompt: 'Rewrite this text in the style of Victorian-era English. Use formal, proper language, elaborate sentence structures, and period-appropriate expressions.',
+        },
+        'noir': {
+            name: '🕵️ Film Noir Detective',
+            prompt: 'Rewrite this text as a hardboiled detective from a film noir. Use cynical observations, dark metaphors, and clipped, dramatic speech patterns.',
+        },
+        'western': {
+            name: '🤠 Wild West Cowboy',
+            prompt: 'Rewrite this text as a Wild West cowboy would speak. Use folksy expressions, rural dialect, and references to frontier life.',
+        },
+        'wizard': {
+            name: '🧙 Fantasy Wizard',
+            prompt: 'Rewrite this text as an ancient, powerful wizard would speak. Use mystical language, references to arcane knowledge, and a slightly pompous, all-knowing tone.',
+        },
+        'recipe': {
+            name: '👨‍🍳 Recipe Format',
+            prompt: 'Rewrite this text as if it were a cooking recipe. Use a list of "ingredients" (key points) and "instructions" (explanation or process) format.',
+        },
+        'eli5': {
+            name: '👶 Explain Like I\'m 5',
+            prompt: 'Rewrite this text as if explaining to a 5-year-old child. Use simple words, short sentences, concrete examples, and avoid complex concepts.',
+        },
+        'conspiracy': {
+            name: '🔍 Conspiracy Theorist',
+            prompt: 'Rewrite this text as a conspiracy theorist would. Use phrases like "They don\'t want you to know", "connect the dots", reference shadowy organizations, and question official narratives.',
+        },
+        'drunk': {
+            name: '🍺 Slightly Drunk',
+            prompt: 'Rewrite this text as if the speaker was slightly drunk. Include minor typos, slightly rambling thoughts, occasional enthusiasm, and lowered inhibitions.',
+        },
+        'joe_rogan': {
+            name: '🎙️ Joe Rogan',
+            prompt: 'Rewrite this text in the style of Joe Rogan. Use phrases like "it\'s entirely possible", references to DMT or chimps, and his curious, informal interview style.',
         }
     };
 
@@ -280,8 +349,7 @@
             #str-settings-panel .str-debug-info.visible {
                 display: block;
             }
-            
-            .str-context-menu {
+              .str-context-menu {
                 position: absolute;
                 z-index: 10000;
                 background: #2c3e50;
@@ -292,6 +360,8 @@
                 padding: 5px 0;
                 display: none;
                 min-width: 180px;
+                max-height: 300px; /* Limit height */
+                overflow-y: auto; /* Enable vertical scrolling */
             }
             
             .str-context-menu.visible {
@@ -367,8 +437,7 @@
                 opacity: 1;
                 transform: translateX(-50%) translateY(-10px);
             }
-            
-            .str-mode-dropdown {
+              .str-mode-dropdown {
                 position: absolute;
                 background: #2c3e50;
                 color: #ecf0f1;
@@ -378,6 +447,8 @@
                 z-index: 9999;
                 box-shadow: 0 4px 8px rgba(0,0,0,0.2);
                 display: none;
+                max-height: 300px; /* Limit height */
+                overflow-y: auto; /* Enable vertical scrolling */
             }
             
             .str-mode-dropdown.visible {
@@ -443,11 +514,11 @@
             </div>
             
             <div class="str-row">
-                <label>Usage Tips</label>
-                <div class="str-tips">
+                <label>Usage Tips</label>                <div class="str-tips">
                     • Click the ✍️ button that appears next to text fields<br>
                     • Right-click the ✍️ button to select a rewrite mode<br>
-                    • Use Alt+Shift+R to quickly rewrite with last used mode
+                    • Use Alt+Shift+R to quickly rewrite with last used mode<br>
+                    • Use Alt+Z or select "Undo Rewrite" to restore original text
                 </div>
             </div>
             
@@ -755,12 +826,20 @@
                 toggleSettingsPanel();
                 e.preventDefault();
             }
-            
-            // Quick rewrite with last mode
+              // Quick rewrite with last mode
             if (e.key === 'r' && e.altKey && e.shiftKey) {
                 const activeElement = document.activeElement;
                 if (isTextInput(activeElement)) {
                     quickRewrite(activeElement);
+                    e.preventDefault();
+                }
+            }
+            
+            // Undo rewrite with Alt+Z
+            if (e.key === 'z' && e.altKey) {
+                const activeElement = document.activeElement;
+                if (isTextInput(activeElement)) {
+                    undoRewrite(activeElement);
                     e.preventDefault();
                 }
             }
@@ -837,46 +916,55 @@
         const header = document.createElement('div');
         header.className = 'str-context-menu-header';
         header.textContent = 'Smart Text Rewriter';
-        contextMenu.appendChild(header);
-          // Add main rewrite option
+        contextMenu.appendChild(header);        // Add main rewrite option
         const rewriteOption = document.createElement('div');
         rewriteOption.className = 'str-context-menu-item str-rewrite-option';
         rewriteOption.setAttribute('data-action', 'rewrite');
-        rewriteOption.textContent = 'Rewrite Text';
-        rewriteOption.addEventListener('click', function() {
+        rewriteOption.textContent = '✍️ Rewrite Text';
+        rewriteOption.style.cursor = 'pointer';
+        
+        rewriteOption.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent event bubbling
             const mode = getLastUsedMode(target);
             rewriteText(target, mode);
             contextMenu.classList.remove('visible');
         });
         contextMenu.appendChild(rewriteOption);
+          // Add undo option
+        const undoOption = document.createElement('div');
+        undoOption.className = 'str-context-menu-item str-undo-option';
+        undoOption.setAttribute('data-action', 'undo');
+        undoOption.textContent = '↩️ Undo Rewrite';
+        undoOption.style.cursor = 'pointer';
+        
+        undoOption.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent event bubbling
+            undoRewrite(target);
+            contextMenu.classList.remove('visible');
+        });
+        contextMenu.appendChild(undoOption);
         
         // Add separator
         const separator = document.createElement('div');
         separator.className = 'str-context-menu-separator';
-        contextMenu.appendChild(separator);        // Add rewrite modes
-        Object.entries(rewriteModes).forEach(([key, mode]) => {
+        contextMenu.appendChild(separator);
+          // Add rewrite modes
+        Object.entries(rewriteModes).forEach(([key, mode]) => {            
             const option = document.createElement('div');
             option.className = 'str-context-menu-item str-rewrite-option';
             option.setAttribute('data-mode', key);
+            option.textContent = mode.name;
             
-            // Get last used mode to highlight the current one
-            const lastMode = getLastUsedMode(target);
-            if (key === lastMode) {
-                option.textContent = `✓ ${mode.name}`;
-                option.style.fontWeight = 'bold';
-            } else {
-                option.textContent = mode.name;
-            }
-            
-            option.addEventListener('click', function() {
+            // Make the whole item clickable, even when clicking on the emoji
+            option.style.cursor = 'pointer';
+            option.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent event bubbling
                 rewriteText(target, key);
                 contextMenu.classList.remove('visible');
             });
             contextMenu.appendChild(option);
         });
-        
-        // Position the context menu - ensure it's within viewport bounds
-        const rect = contextMenu.getBoundingClientRect();
+          // Position the context menu - ensure it's within viewport bounds
         let left = event.pageX;
         let top = event.pageY;
         
@@ -885,9 +973,22 @@
             left = window.innerWidth - 250;
         }
         
-        // Check bottom edge
-        if (top + rect.height > window.innerHeight) {
-            top = window.innerHeight - rect.height;
+        // Calculate max visible items (1 header + 1 rewrite option + 1 separator + 5 mode items)
+        const itemHeight = 36; // Approximate height of each item
+        const headerHeight = 30; // Header height
+        const separatorHeight = 11; // Separator height with margins
+        const visibleItems = 5; // Show 5 mode items at a time
+        
+        // Calculate total height needed for header, rewrite option, separator, and limited number of mode items
+        const calculatedHeight = headerHeight + itemHeight + separatorHeight + 
+                               (Math.min(Object.keys(rewriteModes).length, visibleItems) * itemHeight);
+        
+        // Set the max-height and check if it exceeds viewport
+        contextMenu.style.maxHeight = `${calculatedHeight}px`;
+        
+        // Check bottom edge with the new calculated height
+        if (top + calculatedHeight > window.innerHeight) {
+            top = window.innerHeight - calculatedHeight - 10; // 10px extra padding
         }
         
         contextMenu.style.left = `${left}px`;
@@ -1073,13 +1174,16 @@
             logger.log('Rewrite aborted - script disabled or invalid element');
             return;
         }
-        
-        const text = getTextFromInput(element);
+          const text = getTextFromInput(element);
         if (!text.trim()) {
             logger.log('No text to rewrite');
             showNotification('⚠️ No text to rewrite! Please enter some text first.', 2000);
             return;
         }
+        
+        // Store the original text for undo function
+        const elementId = element.id || generateUniqueId(element);
+        config.originalText[elementId] = text;
         
         // Save the selected mode for this element
         saveLastUsedMode(element, mode);
@@ -1772,34 +1876,53 @@
         header.className = 'str-mode-dropdown-header';
         header.textContent = 'Select Rewrite Mode';
         header.style.padding = '8px 12px';
-        header.style.fontWeight = 'bold';
-        header.style.borderBottom = '1px solid #34495e';
+        header.style.fontWeight = 'bold';        header.style.borderBottom = '1px solid #34495e';
         dropdown.appendChild(header);
+          // Add undo option at the top
+        const undoItem = document.createElement('div');
+        undoItem.className = 'str-mode-dropdown-item';       
+        undoItem.textContent = '↩️ Undo Rewrite';
+        undoItem.style.borderBottom = '1px solid #34495e';
+        undoItem.style.fontWeight = 'bold';
+        undoItem.style.cursor = 'pointer';
+        
+        undoItem.addEventListener('click', function(e) {
+            e.stopPropagation(); // Prevent event bubbling
+            undoRewrite(element);
+            dropdown.classList.remove('visible');
+        });
+        
+        dropdown.appendChild(undoItem);
           // Add modes
         Object.entries(rewriteModes).forEach(([key, mode]) => {
             const item = document.createElement('div');
             item.className = 'str-mode-dropdown-item';
+            item.textContent = mode.name;
             item.setAttribute('data-mode', key);
             
-            // Get last used mode to highlight the current one
-            const lastMode = getLastUsedMode(element);
-            if (key === lastMode) {
-                item.textContent = `✓ ${mode.name}`;
-                item.style.fontWeight = 'bold';
-            } else {
-                item.textContent = mode.name;
-            }
-            
-            item.addEventListener('click', function() {
+            // Make the whole item clickable, even when clicking on the emoji
+            item.style.cursor = 'pointer';
+            item.addEventListener('click', function(e) {
+                e.stopPropagation(); // Prevent event bubbling
                 rewriteText(element, key);
                 dropdown.classList.remove('visible');
             });
             
             dropdown.appendChild(item);
         });
-        
-        // Position the dropdown near the button
+          // Position the dropdown near the button
         const rect = button.getBoundingClientRect();
+        const dropdownWidth = 200; // Same width as set in CSS
+        
+        // Calculate max visible items (1 header + 5 items)
+        const itemHeight = 36; // Approximate height of each item (8px padding top/bottom + text)
+        const headerHeight = 37; // Header height including border
+        const visibleItems = 5; // Show 5 items at a time
+        
+        // Calculate maximum height based on number of items we want to show
+        const calculatedHeight = headerHeight + (Math.min(Object.keys(rewriteModes).length, visibleItems) * itemHeight);
+        
+        dropdown.style.maxHeight = `${calculatedHeight}px`;
         dropdown.style.left = `${rect.left}px`;
         dropdown.style.top = `${rect.bottom + 5}px`;
         
@@ -1818,5 +1941,32 @@
         setTimeout(() => {
             document.addEventListener('click', closeDropdown);
         }, 10);
+    }
+
+    // Undo rewrite and restore original text
+    function undoRewrite(element) {
+        if (!config.enabled || !element) {
+            logger.log('Undo aborted - script disabled or invalid element');
+            return;
+        }
+        
+        // Generate elementId to look up original text
+        const elementId = element.id || generateUniqueId(element);
+        
+        // Check if we have original text stored
+        if (config.originalText[elementId]) {
+            // Set the original text back to the element
+            setTextToInput(element, config.originalText[elementId]);
+            
+            logger.log('Reverted text to original version');
+            updateDebugInfo(`Undo: Reverted to original text`);
+            
+            // Show success notification
+            showNotification(`↩️ Reverted to original text`, 2000);
+        } else {
+            // No original text found
+            logger.log('No original text found for undo');
+            showNotification('⚠️ No original text found to restore', 2000);
+        }
     }
 })();
