@@ -82,10 +82,6 @@
     };    // Main initialization
     function init() {
         logger.log('Initializing Smart Text Rewriter');
-        console.log('[Smart Text Rewriter] Initializing script...');
-        
-        // Debug mode on by default for troubleshooting
-        config.debug = true;
         
         // Check if script is enabled
         if (!config.enabled) {
@@ -111,27 +107,11 @@
         // Setup context menu
         setupContextMenu();
         
-        // Show prominent notification
-        showNotification('Smart Text Rewriter is starting up! Buttons should appear next to text fields.', 5000);
-        
-        // Add rewrite buttons to text fields
-        setupRewriteButtons();
-        
-        // Detect text input fields immediately and repeatedly
-        detectTextInputs();
-        
-        // More aggressive repeated detection
-        setInterval(detectTextInputs, 2000); // Check every 2 seconds
-        
-        // Setup observers for dynamically added elements
-        setupObservers();
+        // Setup user interaction-based button creation
+        setupUserInteractionHandlers();
         
         // Fetch available models
         fetchOllamaModels();
-        
-        // Shadow DOM traversal to find text inputs in modern web apps - run more frequently
-        setTimeout(traverseShadowDOM, 1000); // First check after 1 second
-        setInterval(traverseShadowDOM, 3000); // Keep checking periodically
         
         // Register smart reply keyboard shortcut
         document.addEventListener('keydown', function(e) {
@@ -144,11 +124,8 @@
             }
         });
         
-        // Create a debug button that's always visible
-        createDebugButton();
-        
         logger.log('Initialization complete');
-        console.log('[Smart Text Rewriter] Initialization complete');
+        showNotification('Smart Text Rewriter is active! Click in any text field to see rewrite buttons.', 3000);
     }// Add CSS styles
     function addStyles() {
         GM_addStyle(`
@@ -861,12 +838,11 @@
         header.className = 'str-context-menu-header';
         header.textContent = 'Smart Text Rewriter';
         contextMenu.appendChild(header);
-        
-        // Add main rewrite option
+          // Add main rewrite option
         const rewriteOption = document.createElement('div');
         rewriteOption.className = 'str-context-menu-item str-rewrite-option';
         rewriteOption.setAttribute('data-action', 'rewrite');
-        rewriteOption.innerHTML = '<span class="str-icon">✍️</span> Rewrite Text';
+        rewriteOption.textContent = 'Rewrite Text';
         rewriteOption.addEventListener('click', function() {
             const mode = getLastUsedMode(target);
             rewriteText(target, mode);
@@ -877,14 +853,21 @@
         // Add separator
         const separator = document.createElement('div');
         separator.className = 'str-context-menu-separator';
-        contextMenu.appendChild(separator);
-        
-        // Add rewrite modes
+        contextMenu.appendChild(separator);        // Add rewrite modes
         Object.entries(rewriteModes).forEach(([key, mode]) => {
             const option = document.createElement('div');
             option.className = 'str-context-menu-item str-rewrite-option';
             option.setAttribute('data-mode', key);
-            option.innerHTML = `<span class="str-icon">${mode.name.split(' ')[0]}</span> ${mode.name}`;
+            
+            // Get last used mode to highlight the current one
+            const lastMode = getLastUsedMode(target);
+            if (key === lastMode) {
+                option.textContent = `✓ ${mode.name}`;
+                option.style.fontWeight = 'bold';
+            } else {
+                option.textContent = mode.name;
+            }
+            
             option.addEventListener('click', function() {
                 rewriteText(target, key);
                 contextMenu.classList.remove('visible');
@@ -918,92 +901,46 @@
         }, 100);
     }    // Detect all text input areas on the page
     function detectTextInputs() {
-        // Select all text inputs, textareas, and contenteditable elements
+        // Just log the count for information - we'll only add buttons on interaction
         const textInputs = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
         logger.log(`Detected ${textInputs.length} text input fields`);
-        console.log(`[Smart Text Rewriter] Detected ${textInputs.length} text input fields`);
+    }// Setup handlers that only activate when the user interacts with an input
+    function setupUserInteractionHandlers() {
+        // Only create buttons when the user focuses on a text input
+        document.addEventListener('focus', function(e) {
+            if (!config.enabled) return;
+            
+            const target = e.target;
+            if (isTextInput(target)) {
+                addRewriteButton(target);
+                logger.log('Added button after user focus on input');
+            }
+        }, true);
         
-        // Add buttons to each input
-        textInputs.forEach(input => {
-            addRewriteButton(input);
-        });
-        
-        // Check for specific common inputs that might be missed
-        const commonSelectors = [
-            '.twitter-tweet textarea', // Twitter
-            '.public-DraftEditor-content', // Draft.js based editors
-            '.gmail_default', // Gmail
-            '.editable', // Many contenteditable areas
-            '[role="textbox"]', // ARIA role textbox
-            '.message-input', // Common chat inputs
-            '.CommentBox', // Reddit-style
-            '.post-editor', // Forum-like editors
-            '.commentArea' // Comment areas
-        ];
-        
-        // Try to find these specific inputs
-        commonSelectors.forEach(selector => {
-            try {
-                const elements = document.querySelectorAll(selector);
-                if (elements.length > 0) {
-                    console.log(`[Smart Text Rewriter] Found ${elements.length} special inputs with selector: ${selector}`);
-                    elements.forEach(element => {
-                        addRewriteButton(element);
-                    });
-                }
-            } catch (error) {
-                console.error(`[Smart Text Rewriter] Error with selector ${selector}:`, error);
+        // Also handle click events on text inputs
+        document.addEventListener('click', function(e) {
+            if (!config.enabled) return;
+            
+            // Check if the click was directly on a text input
+            const target = e.target;
+            if (isTextInput(target)) {
+                addRewriteButton(target);
+                logger.log('Added button after user click on input');
             }
         });
         
-        return textInputs.length;
-    }// Setup observers for dynamically added elements
-    function setupObservers() {
-        // Mutation Observer for detecting new elements
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(mutation => {
-                if (mutation.addedNodes && mutation.addedNodes.length > 0) {
-                    mutation.addedNodes.forEach(node => {
-                        // Check if the added node is a text input
-                        if (node.nodeType === Node.ELEMENT_NODE && isTextInput(node)) {
-                            logger.log('New text input detected', node);
-                            // Note: We don't need to explicitly add buttons here since
-                            // they are added dynamically on focus via the event listener
-                        }
-                        
-                        // Check for text inputs within added nodes
-                        if (node.nodeType === Node.ELEMENT_NODE && node.querySelectorAll) {
-                            const textInputs = node.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
-                            if (textInputs.length > 0) {
-                                logger.log(`Detected ${textInputs.length} text inputs in added content`);
-                                // The global focus event will handle adding buttons to these inputs
-                            }
-                        }
-                    });
+        // Keyboard shortcut for quick rewrite (Alt+Shift+R)
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'r' && e.altKey && e.shiftKey && config.enabled) {
+                const activeElement = document.activeElement;
+                if (isTextInput(activeElement)) {
+                    const mode = getLastUsedMode(activeElement);
+                    rewriteText(activeElement, mode);
+                    e.preventDefault();
                 }
-            });
+            }
         });
-        
-        // Start observing
-        observer.observe(document.body, {
-            childList: true,
-            subtree: true
-        });
-        
-        // IntersectionObserver for detecting visible elements
-        const intersectionObserver = new IntersectionObserver(entries => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting && isTextInput(entry.target)) {
-                    logger.log('Text input entered viewport', entry.target);
-                }
-            });
-        });
-        
-        // Observe all text inputs
-        document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]').forEach(input => {
-            intersectionObserver.observe(input);
-        });
-    }    // Check if an element is a text input
+    }// Check if an element is a text input
     function isTextInput(element) {
         if (!element || !element.tagName) return false;
         
@@ -1271,103 +1208,11 @@
         document.querySelectorAll('div[style*="position: fixed"][style*="transform: translateX(-50%)"]').forEach(el => {
             if (el.parentNode) el.parentNode.removeChild(el);
         });
-    }    // Setup rewrite buttons for text fields - New implementation
-    function setupRewriteButtons() {
-        // Add an initial notification to show the script is active
-        showNotification('Smart Text Rewriter is active! Click in any text field to see rewrite buttons.', 5000);
-        console.log('[Smart Text Rewriter] Setting up rewrite buttons');
-        
-        // Global event listener for input fields
-        document.addEventListener('click', function(e) {
-            if (!config.enabled) return;
-            
-            console.log('[Smart Text Rewriter] Click detected, checking for nearby text inputs');
-            
-            // Check if clicked on or near text input
-            const nearbyInput = findNearbyTextInput(e.target, e.clientX, e.clientY);
-            if (nearbyInput) {
-                addRewriteButton(nearbyInput);
-                console.log('[Smart Text Rewriter] Added button after user click near input field');
-            }
-        });
-
-        // Global event listener for focus on text fields
-        document.addEventListener('focus', function(e) {
-            if (!config.enabled) return;
-            
-            console.log('[Smart Text Rewriter] Focus detected on element:', e.target);
-            
-            if (isTextInput(e.target)) {
-                addRewriteButton(e.target);
-                console.log('[Smart Text Rewriter] Added button after input field focus');
-            }
-        }, true);
-        
-        // Global event listener for mouseenter on text fields
-        document.addEventListener('mouseenter', function(e) {
-            if (!config.enabled) return;
-            
-            if (isTextInput(e.target)) {
-                addRewriteButton(e.target);
-                console.log('[Smart Text Rewriter] Added button after mouse enter on input field');
-            }
-        }, true);
-        
-        // Add rewrite buttons to all currently visible text inputs
-        const allInputs = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
-        console.log(`[Smart Text Rewriter] Found ${allInputs.length} text inputs on page load`);
-        
-        // Immediate notification for troubleshooting
-        if (allInputs.length > 0) {
-            showNotification(`Found ${allInputs.length} text inputs. Adding buttons...`, 3000);
-        } else {
-            showNotification('No text inputs found yet. Will keep looking...', 3000);
-        }
-        
-        allInputs.forEach(input => {
-            addRewriteButton(input);
-            console.log('[Smart Text Rewriter] Added button to input on initial load:', input);
-        });
-        
-        // Show status message
-        showNotification(`Added ${document.querySelectorAll('.str-rewrite-button').length} rewrite buttons`, 3000);
-
-        // Set a periodic check for text inputs that might appear later
-        setInterval(function() {
-            const count = detectTextInputs();
-            console.log(`[Smart Text Rewriter] Periodic check found ${count} text inputs`);
-        }, 5000);
-        
-        // After a delay, force check again and show status
-        setTimeout(function() {
-            const buttonCount = document.querySelectorAll('.str-rewrite-button').length;
-            const inputCount = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]').length;
-            showNotification(`Status: Found ${inputCount} text inputs, added ${buttonCount} buttons`, 5000);
-            
-            // If no buttons were added but inputs exist, try again with more debugging
-            if (buttonCount === 0 && inputCount > 0) {
-                console.log('[Smart Text Rewriter] No buttons created but inputs exist. Retrying...');
-                allInputs.forEach(input => {
-                    console.log('[Smart Text Rewriter] Force adding button to:', input);
-                    addRewriteButton(input);
-                });
-            }
-        }, 10000);
-    }
-    
-    // Find a text input near the clicked position
+    }    // Find a text input near the clicked position
     function findNearbyTextInput(element, x, y) {
         // Check if element itself is a text input
         if (isTextInput(element)) {
             return element;
-        }
-        
-        // Look for text inputs near the clicked position
-        const inputElements = document.elementsFromPoint(x, y);
-        for (const el of inputElements) {
-            if (isTextInput(el)) {
-                return el;
-            }
         }
         
         // Check parent elements (often clicks happen on child elements of inputs)
@@ -1383,7 +1228,7 @@
         }
         
         return null;
-    }    // Add a rewrite button for a text input
+    }// Add a rewrite button for a text input
     function addRewriteButton(element) {
         if (!element || !config.enabled) return;
         
@@ -1405,36 +1250,21 @@
         button.innerHTML = '✍️<span class="str-tooltip">Smart Rewrite</span>';
         button.setAttribute('data-for', elementId);
         
-        // Make the button VERY visible - bigger and more prominent
-        button.style.position = 'fixed'; // Changed from absolute to fixed
-        button.style.zIndex = '999999'; // Increased z-index
-        button.style.background = 'red'; // Pure red to be more noticeable
+        // Style the button
+        button.style.position = 'absolute';
+        button.style.zIndex = '9999';
+        button.style.background = '#e74c3c'; 
         button.style.color = 'white';
-        button.style.fontSize = '24px'; // Increased size
-        button.style.width = '50px'; // Increased width
-        button.style.height = '50px'; // Increased height
+        button.style.fontSize = '18px';
+        button.style.width = '36px';
+        button.style.height = '36px';
         button.style.borderRadius = '50%';
-        button.style.border = '3px solid yellow'; // Bold yellow border
-        button.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)'; // Stronger shadow
+        button.style.border = '2px solid white';
+        button.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
         button.style.cursor = 'pointer';
         button.style.display = 'flex';
         button.style.alignItems = 'center';
         button.style.justifyContent = 'center';
-        button.style.animation = 'pulse-animation 2s infinite'; // Add animation
-        
-        // Add pulsing animation
-        const styleSheet = document.createElement('style');
-        styleSheet.textContent = `
-            @keyframes pulse-animation {
-                0% { transform: scale(1); }
-                50% { transform: scale(1.1); }
-                100% { transform: scale(1); }
-            }
-        `;
-        document.head.appendChild(styleSheet);
-        
-        // Position the button
-        positionRewriteButton(button, element);
         
         // Add click event to rewrite with default/last mode
         button.addEventListener('click', function(e) {
@@ -1442,6 +1272,11 @@
             e.stopPropagation();
             const mode = getLastUsedMode(element);
             rewriteText(element, mode);
+            
+            // Remove the button after clicking it
+            if (button.parentNode) {
+                button.parentNode.removeChild(button);
+            }
         });
         
         // Right-click to show mode selection
@@ -1451,75 +1286,43 @@
             showModeDropdown(e, element, button);
         });
         
+        // Position and add the button to the document
+        positionRewriteButton(button, element);
+        
         // Add the button to the document
         document.body.appendChild(button);
-        console.log('[Smart Text Rewriter] Added button to element', element);
-        showNotification('Rewrite button added! Click it to rewrite text.', 3000);
+        logger.log('Added button to element', element);
         
-        // Log debug information
-        logger.log('Button created for element:', element);
-        logger.log('Button properties:', {
-            position: button.style.position,
-            zIndex: button.style.zIndex,
-            background: button.style.background,
-            dimensions: `${button.style.width}x${button.style.height}`
-        });
-        
-        // Debug notification
-        showNotification('Debug: Button should be visible now!', 2000);
+        // Remove button when element loses focus
+        element.addEventListener('blur', function() {
+            setTimeout(() => {
+                if (button.parentNode && document.activeElement !== button) {
+                    button.parentNode.removeChild(button);
+                }
+            }, 200);
+        }, { once: true });
     }    // Position a rewrite button next to its text input
     function positionRewriteButton(button, element) {
         if (!element || !button) return;
         
         try {
             const rect = element.getBoundingClientRect();
-            const scrollX = window.scrollX || window.pageXOffset;
-            const scrollY = window.scrollY || window.pageYOffset;
             
-            // Fixed positioning in viewport coordinates
-            button.style.position = 'fixed';
+            // Position the button slightly offset from the top-right corner of the input
+            const top = rect.top + 5;
+            const left = rect.right + 5;
             
-            // Position to the right of the input with some spacing
-            button.style.left = `${rect.right + 20}px`;
-            button.style.top = `${rect.top + (rect.height/2) - 25}px`;
-            
-            // Alternative position if near the edge of the viewport
-            if (rect.right + 70 > window.innerWidth) {
-                // Move to the left of the input if near right edge
-                button.style.left = `${rect.left - 70}px`;
-            }
+            button.style.position = 'absolute';
+            button.style.top = `${top + window.scrollY}px`;
+            button.style.left = `${left + window.scrollX}px`;
             
             // Make sure the button is in the document
             if (!button.parentNode) {
                 document.body.appendChild(button);
-                console.log('[Smart Text Rewriter] Added button to document body');
-                showNotification('Rewrite button added! Click it to rewrite text.', 2000);
+                logger.log('Added button to document body');
             }
-            
-            // Debug info
-            console.log('[Smart Text Rewriter] Button positioned at:', {
-                left: button.style.left,
-                top: button.style.top,
-                elementRect: {
-                    left: rect.left,
-                    right: rect.right,
-                    top: rect.top,
-                    bottom: rect.bottom,
-                    width: rect.width,
-                    height: rect.height
-                }
-            });
         } catch (error) {
-            console.error('[Smart Text Rewriter] Error positioning button:', error);
-            
-            // Fallback position in case of error
-            button.style.top = '100px';
-            button.style.left = '100px';
-            
-            // Make sure the button is in the document even if there's an error
-            if (!button.parentNode) {
-                document.body.appendChild(button);
-            }
+            logger.error('Error positioning button:', error);
         }
     }
     
@@ -1590,80 +1393,9 @@
             if (message.parentNode) message.parentNode.removeChild(message);
         }, 2000);
     });
-    
-    // Initialize the script
+      // Initialize the script
     init();
 
-    // Shadow DOM traversal to find text inputs in modern web apps
-    function traverseShadowDOM() {
-        // Function to recursively find shadow roots
-        function findShadowRoots(node, foundRoots = []) {
-            if (!node) return foundRoots;
-            
-            // Check if node has shadow root
-            if (node.shadowRoot) {
-                foundRoots.push(node.shadowRoot);
-                
-                // Find text inputs in this shadow root
-                const shadowInputs = node.shadowRoot.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
-                logger.log(`Found ${shadowInputs.length} text inputs in shadow DOM`);
-                
-                // Apply observers to shadow root
-                setupObserverForNode(node.shadowRoot);
-                
-                // Add rewrite buttons to visible inputs
-                shadowInputs.forEach(input => {
-                    if (isElementVisible(input)) {
-                        addRewriteButton(input);
-                    }
-                });
-            }
-            
-            // Check children of this node
-            const children = node.querySelectorAll('*');
-            children.forEach(child => {
-                findShadowRoots(child, foundRoots);
-            });
-            
-            return foundRoots;
-        }
-        
-        // Start from document body
-        findShadowRoots(document.body);
-        
-        logger.log('Shadow DOM traversal complete');
-    }
-    
-    // Setup observer for specific node
-    function setupObserverForNode(node) {
-        const observer = new MutationObserver(mutations => {
-            mutations.forEach(mutation => {
-                if (mutation.addedNodes && mutation.addedNodes.length > 0) {
-                    mutation.addedNodes.forEach(addedNode => {
-                        // Check if the added node is a text input
-                        if (addedNode.nodeType === Node.ELEMENT_NODE && isTextInput(addedNode)) {
-                            logger.log('New text input detected in observed node', addedNode);
-                        }
-                        
-                        // Find text inputs in added node
-                        if (addedNode.nodeType === Node.ELEMENT_NODE && addedNode.querySelectorAll) {
-                            const textInputs = addedNode.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
-                            if (textInputs.length > 0) {
-                                logger.log(`Detected ${textInputs.length} text inputs in added content`);
-                            }
-                        }
-                    });
-                }
-            });
-        });
-        
-        // Start observing
-        observer.observe(node, {
-            childList: true,
-            subtree: true
-        });
-    }
-    
     // Site-specific enhancements and context extraction
     const siteSpecificConfig = {
         // Twitter/X
@@ -1693,7 +1425,8 @@
                 postEditor: '.submit-page textarea',
                 contextPost: '.sitetable.nestedlisting .entry .md'
             },
-            extractContext: function() {                // Extract post or comment being replied to
+            extractContext: function() {
+                // Extract post or comment being replied to
                 const contextPosts = document.querySelectorAll(this.selectors.contextPost);
                 if (contextPosts.length > 0) {
                     // Get the last one (direct parent)
@@ -2042,13 +1775,20 @@
         header.style.fontWeight = 'bold';
         header.style.borderBottom = '1px solid #34495e';
         dropdown.appendChild(header);
-        
-        // Add modes
+          // Add modes
         Object.entries(rewriteModes).forEach(([key, mode]) => {
             const item = document.createElement('div');
             item.className = 'str-mode-dropdown-item';
-            item.textContent = mode.name;
             item.setAttribute('data-mode', key);
+            
+            // Get last used mode to highlight the current one
+            const lastMode = getLastUsedMode(element);
+            if (key === lastMode) {
+                item.textContent = `✓ ${mode.name}`;
+                item.style.fontWeight = 'bold';
+            } else {
+                item.textContent = mode.name;
+            }
             
             item.addEventListener('click', function() {
                 rewriteText(element, key);
@@ -2078,51 +1818,5 @@
         setTimeout(() => {
             document.addEventListener('click', closeDropdown);
         }, 10);
-    }
-
-    // Create a debug button that's always visible in the corner
-    function createDebugButton() {
-        const button = document.createElement('button');
-        button.textContent = 'STR Debug';
-        button.style.position = 'fixed';
-        button.style.bottom = '20px';
-        button.style.right = '20px';
-        button.style.zIndex = '999999';
-        button.style.background = 'blue';
-        button.style.color = 'white';
-        button.style.padding = '10px 15px';
-        button.style.borderRadius = '5px';
-        button.style.border = '2px solid white';
-        button.style.boxShadow = '0 0 10px rgba(0,0,0,0.5)';
-        button.style.cursor = 'pointer';
-        button.style.fontSize = '16px';
-        
-        button.addEventListener('click', function() {
-            // Show current status of the script
-            const status = {
-                enabled: config.enabled,
-                buttonsAdded: document.querySelectorAll('.str-rewrite-button').length,
-                textInputsFound: document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]').length,
-                settingsPanelVisible: config.settingsPanelVisible,
-                selectedModel: config.selectedModel,
-                endpoint: config.ollamaEndpoint
-            };
-            
-            console.log('[Smart Text Rewriter] Status:', status);
-            
-            // Force add buttons to all text inputs
-            const allInputs = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
-            
-            showNotification(`Found ${allInputs.length} text inputs. Adding buttons...`, 3000);
-            
-            allInputs.forEach(input => {
-                addRewriteButton(input);
-            });
-            
-            // Show notification
-            showNotification(`Debug info: Found ${allInputs.length} text inputs, added ${document.querySelectorAll('.str-rewrite-button').length} buttons`, 5000);
-        });
-        
-        document.body.appendChild(button);
     }
 })();
