@@ -916,14 +916,48 @@
             const firstItem = contextMenu.querySelector('.str-rewrite-option');
             if (firstItem) firstItem.focus();
         }, 100);
-    }
-
-    // Detect all text input areas on the page
+    }    // Detect all text input areas on the page
     function detectTextInputs() {
         // Select all text inputs, textareas, and contenteditable elements
         const textInputs = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
         logger.log(`Detected ${textInputs.length} text input fields`);
-    }    // Setup observers for dynamically added elements
+        console.log(`[Smart Text Rewriter] Detected ${textInputs.length} text input fields`);
+        
+        // Add buttons to each input
+        textInputs.forEach(input => {
+            addRewriteButton(input);
+        });
+        
+        // Check for specific common inputs that might be missed
+        const commonSelectors = [
+            '.twitter-tweet textarea', // Twitter
+            '.public-DraftEditor-content', // Draft.js based editors
+            '.gmail_default', // Gmail
+            '.editable', // Many contenteditable areas
+            '[role="textbox"]', // ARIA role textbox
+            '.message-input', // Common chat inputs
+            '.CommentBox', // Reddit-style
+            '.post-editor', // Forum-like editors
+            '.commentArea' // Comment areas
+        ];
+        
+        // Try to find these specific inputs
+        commonSelectors.forEach(selector => {
+            try {
+                const elements = document.querySelectorAll(selector);
+                if (elements.length > 0) {
+                    console.log(`[Smart Text Rewriter] Found ${elements.length} special inputs with selector: ${selector}`);
+                    elements.forEach(element => {
+                        addRewriteButton(element);
+                    });
+                }
+            } catch (error) {
+                console.error(`[Smart Text Rewriter] Error with selector ${selector}:`, error);
+            }
+        });
+        
+        return textInputs.length;
+    }// Setup observers for dynamically added elements
     function setupObservers() {
         // Mutation Observer for detecting new elements
         const observer = new MutationObserver(mutations => {
@@ -1240,17 +1274,20 @@
     }    // Setup rewrite buttons for text fields - New implementation
     function setupRewriteButtons() {
         // Add an initial notification to show the script is active
-        showNotification('Smart Text Rewriter is active! Click in any text field to see rewrite buttons.', 3000);
+        showNotification('Smart Text Rewriter is active! Click in any text field to see rewrite buttons.', 5000);
+        console.log('[Smart Text Rewriter] Setting up rewrite buttons');
         
         // Global event listener for input fields
         document.addEventListener('click', function(e) {
             if (!config.enabled) return;
             
+            console.log('[Smart Text Rewriter] Click detected, checking for nearby text inputs');
+            
             // Check if clicked on or near text input
             const nearbyInput = findNearbyTextInput(e.target, e.clientX, e.clientY);
             if (nearbyInput) {
                 addRewriteButton(nearbyInput);
-                logger.log('Added button after user click near input field');
+                console.log('[Smart Text Rewriter] Added button after user click near input field');
             }
         });
 
@@ -1258,23 +1295,64 @@
         document.addEventListener('focus', function(e) {
             if (!config.enabled) return;
             
+            console.log('[Smart Text Rewriter] Focus detected on element:', e.target);
+            
             if (isTextInput(e.target)) {
                 addRewriteButton(e.target);
-                logger.log('Added button after input field focus');
+                console.log('[Smart Text Rewriter] Added button after input field focus');
+            }
+        }, true);
+        
+        // Global event listener for mouseenter on text fields
+        document.addEventListener('mouseenter', function(e) {
+            if (!config.enabled) return;
+            
+            if (isTextInput(e.target)) {
+                addRewriteButton(e.target);
+                console.log('[Smart Text Rewriter] Added button after mouse enter on input field');
             }
         }, true);
         
         // Add rewrite buttons to all currently visible text inputs
         const allInputs = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]');
-        logger.log(`Found ${allInputs.length} text inputs on page load`);
+        console.log(`[Smart Text Rewriter] Found ${allInputs.length} text inputs on page load`);
+        
+        // Immediate notification for troubleshooting
+        if (allInputs.length > 0) {
+            showNotification(`Found ${allInputs.length} text inputs. Adding buttons...`, 3000);
+        } else {
+            showNotification('No text inputs found yet. Will keep looking...', 3000);
+        }
         
         allInputs.forEach(input => {
             addRewriteButton(input);
-            logger.log('Added button to input on initial load');
+            console.log('[Smart Text Rewriter] Added button to input on initial load:', input);
         });
+        
+        // Show status message
+        showNotification(`Added ${document.querySelectorAll('.str-rewrite-button').length} rewrite buttons`, 3000);
 
         // Set a periodic check for text inputs that might appear later
-        setInterval(detectTextInputs, 5000);
+        setInterval(function() {
+            const count = detectTextInputs();
+            console.log(`[Smart Text Rewriter] Periodic check found ${count} text inputs`);
+        }, 5000);
+        
+        // After a delay, force check again and show status
+        setTimeout(function() {
+            const buttonCount = document.querySelectorAll('.str-rewrite-button').length;
+            const inputCount = document.querySelectorAll('textarea, input[type="text"], [contenteditable="true"]').length;
+            showNotification(`Status: Found ${inputCount} text inputs, added ${buttonCount} buttons`, 5000);
+            
+            // If no buttons were added but inputs exist, try again with more debugging
+            if (buttonCount === 0 && inputCount > 0) {
+                console.log('[Smart Text Rewriter] No buttons created but inputs exist. Retrying...');
+                allInputs.forEach(input => {
+                    console.log('[Smart Text Rewriter] Force adding button to:', input);
+                    addRewriteButton(input);
+                });
+            }
+        }, 10000);
     }
     
     // Find a text input near the clicked position
