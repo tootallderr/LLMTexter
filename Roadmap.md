@@ -1,41 +1,73 @@
+
+
+
 # LLMTexter Roadmap
 
 ## UI Improvements
-- [ ] **Dark Mode**
-    - Add theme toggle functionality
-    - Create a consistent dark color palette
-- [ ] **Accessibility Enhancements**
-    - Improve screen reader compatibility
-    - Add keyboard shortcuts for common actions
-- [ ] **User Customization**
-    - Allow users to customize the UI layout
-    - Add personalized settings for text size and font preferences
+
+- [] **Dark Mode**
+  -  Add theme toggle functionality (Alt+T)
+  -  Create a consistent dark color palette
+
+- [] **Accessibility Enhancements**
+  -  Improve screen reader compatibility with ARIA labels
+  -  Add keyboard shortcuts for common actions
+
+- [] **Bionic Reading Mode**
+  -  Implement text parsing algorithm to highlight letter patterns
+  -  Add toggle button in the UI toolbar (Alt+B)
+  -  Create customization options for highlight intensity
+  -  Support different languages and character sets
+  -  Add animation transitions for enabling/disabling mode
+
+- [] **User Customization**
+  -  Allow users to customize the UI layout
+  -  Add personalized settings for text size and font preferences
+
+
+
+
+
 
 ## Performance Optimizations
+
 - [ ] **Backend Efficiency**
-    - Implement request batching for LLM queries
-    - Add caching layer for frequent responses
+  - Implement request batching for LLM queries
+  - Add caching layer for frequent responses
+
 - [ ] **Frontend Optimization**
-    - Reduce JavaScript bundle size
-    - Implement lazy loading for non-critical components
+  - Reduce JavaScript bundle size
+  - Implement lazy loading for non-critical components
+
 - [ ] **Synchronization Improvements**
-    - Optimize GitHub sync process
-    - Add selective sync options for large repositories
+  - Optimize GitHub sync process
+  - Add selective sync options for large repositories
 
 ## LLM Integration Enhancements
+
 - [ ] **Multimedia Processing**
-    - Support for video content analysis and summarization
-    - Enable image recognition and description capabilities
+  - Support for video content analysis and summarization
+  - Enable image recognition and description capabilities
+
 - [ ] **Browser Extension Features**
-    - Add context-aware content suggestions
-    - Implement real-time webpage analysis
+  - Add context-aware content suggestions
+  - Implement real-time webpage analysis
+
 - [ ] **Advanced LLM Utilization**
-    - Implement multi-modal interactions (text + image input)
-    - Create specialized modes for different content types (code, academic, creative)
+  - Implement multi-modal interactions (text + image input)
+  - Create specialized modes for different content types (code, academic, creative)
+
+
+
+
+
+
+
 
 ## Video Captioning and Translation Feature
 
 ### Overview
+
 Implement a feature that uses local LLMs to generate, enhance, and translate video captions. This would work alongside Whisper for initial transcription and use the rewriting modes to process captions.
 
 ### Implementation Plan
@@ -80,12 +112,14 @@ Implement a feature that uses local LLMs to generate, enhance, and translate vid
    - Support sharing captions between users
 
 ### Technical Considerations
+
 - Balancing caption accuracy with processing speed
 - Handling processing delays with longer videos
 - Managing resource usage on client machines
 - Ensuring proper synchronization between video and captions
 
 ### Future Enhancements
+
 - Multi-language support for UI and captions
 - Custom templates for different video types (lectures, movies, etc.)
 - Voice-matching for multi-speaker videos
@@ -93,3 +127,38 @@ Implement a feature that uses local LLMs to generate, enhance, and translate vid
 
 ## Timeline
 
+### Phase 1: Core Features (Q1 2024)
+-  Basic text rewriting functionality
+-  Dark mode and accessibility features
+-  Bionic reading implementation
+- [ ] Initial performance optimizations
+
+### Phase 2: Enhanced LLM Integration (Q2 2024)
+- [ ] Backend efficiency improvements
+- [ ] Multi-modal input support
+- [ ] Context-aware suggestions
+- [ ] Real-time webpage analysis
+
+### Phase 3: Video Features (Q3 2024)
+- [ ] Speech recognition integration
+- [ ] Basic caption processing
+- [ ] Video player controls
+- [ ] Caption synchronization system
+
+### Phase 4: Advanced Features (Q4 2024)
+- [ ] Multi-language support
+- [ ] Advanced caption processing modes
+- [ ] Export functionality
+- [ ] Performance optimizations
+
+### Phase 5: Platform Integration (Q1 2025)
+- [ ] Popular platform integrations
+- [ ] Browser extension features
+- [ ] API improvements
+- [ ] Community features
+
+### Maintenance and Updates
+- Continuous bug fixes and improvements
+- Regular LLM model updates
+- Performance monitoring and optimization
+- Security patches and updates

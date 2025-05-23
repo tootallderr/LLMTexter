@@ -916,29 +916,23 @@
         const header = document.createElement('div');
         header.className = 'str-context-menu-header';
         header.textContent = 'Smart Text Rewriter';
-        contextMenu.appendChild(header);        // Add main rewrite option
-        const rewriteOption = document.createElement('div');
+        contextMenu.appendChild(header);
+          // Add main rewrite option        const rewriteOption = document.createElement('div');
         rewriteOption.className = 'str-context-menu-item str-rewrite-option';
         rewriteOption.setAttribute('data-action', 'rewrite');
         rewriteOption.textContent = '✍️ Rewrite Text';
-        rewriteOption.style.cursor = 'pointer';
-        
-        rewriteOption.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent event bubbling
+        rewriteOption.addEventListener('click', function() {
             const mode = getLastUsedMode(target);
             rewriteText(target, mode);
             contextMenu.classList.remove('visible');
         });
         contextMenu.appendChild(rewriteOption);
-          // Add undo option
-        const undoOption = document.createElement('div');
+        
+        // Add undo option        const undoOption = document.createElement('div');
         undoOption.className = 'str-context-menu-item str-undo-option';
         undoOption.setAttribute('data-action', 'undo');
         undoOption.textContent = '↩️ Undo Rewrite';
-        undoOption.style.cursor = 'pointer';
-        
-        undoOption.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent event bubbling
+        undoOption.addEventListener('click', function() {
             undoRewrite(target);
             contextMenu.classList.remove('visible');
         });
@@ -948,17 +942,13 @@
         const separator = document.createElement('div');
         separator.className = 'str-context-menu-separator';
         contextMenu.appendChild(separator);
-          // Add rewrite modes
-        Object.entries(rewriteModes).forEach(([key, mode]) => {            
-            const option = document.createElement('div');
+        
+        // Add rewrite modes
+        Object.entries(rewriteModes).forEach(([key, mode]) => {            const option = document.createElement('div');
             option.className = 'str-context-menu-item str-rewrite-option';
             option.setAttribute('data-mode', key);
             option.textContent = mode.name;
-            
-            // Make the whole item clickable, even when clicking on the emoji
-            option.style.cursor = 'pointer';
-            option.addEventListener('click', function(e) {
-                e.stopPropagation(); // Prevent event bubbling
+            option.addEventListener('click', function() {
                 rewriteText(target, key);
                 contextMenu.classList.remove('visible');
             });
@@ -1878,32 +1868,28 @@
         header.style.padding = '8px 12px';
         header.style.fontWeight = 'bold';        header.style.borderBottom = '1px solid #34495e';
         dropdown.appendChild(header);
-          // Add undo option at the top
+        
+        // Add undo option at the top
         const undoItem = document.createElement('div');
-        undoItem.className = 'str-mode-dropdown-item';       
-        undoItem.textContent = '↩️ Undo Rewrite';
+        undoItem.className = 'str-mode-dropdown-item';        undoItem.textContent = '↩️ Undo Rewrite';
         undoItem.style.borderBottom = '1px solid #34495e';
         undoItem.style.fontWeight = 'bold';
-        undoItem.style.cursor = 'pointer';
         
-        undoItem.addEventListener('click', function(e) {
-            e.stopPropagation(); // Prevent event bubbling
+        undoItem.addEventListener('click', function() {
             undoRewrite(element);
             dropdown.classList.remove('visible');
         });
         
         dropdown.appendChild(undoItem);
-          // Add modes
+        
+        // Add modes
         Object.entries(rewriteModes).forEach(([key, mode]) => {
             const item = document.createElement('div');
             item.className = 'str-mode-dropdown-item';
             item.textContent = mode.name;
             item.setAttribute('data-mode', key);
             
-            // Make the whole item clickable, even when clicking on the emoji
-            item.style.cursor = 'pointer';
-            item.addEventListener('click', function(e) {
-                e.stopPropagation(); // Prevent event bubbling
+            item.addEventListener('click', function() {
                 rewriteText(element, key);
                 dropdown.classList.remove('visible');
             });
