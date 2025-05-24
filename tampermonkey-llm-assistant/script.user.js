@@ -1,12 +1,16 @@
 // ==UserScript==
 // @name         LLM Text Assistant
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  Enhance browsing and writing with automatic text rewriting using LLMs via Ollama
-// @author       You
+// @author       tootallderr
 // @match        *://*/*
 // @grant        none
 // @run-at       document-end
+// @homepageURL  https://github.com/tootallderr/LLMTexter
+// @supportURL   https://github.com/tootallderr/LLMTexter/issues
+// @updateURL    https://raw.githubusercontent.com/tootallderr/LLMTexter/main/script.user.js
+// @downloadURL  https://raw.githubusercontent.com/tootallderr/LLMTexter/main/script.user.js
 // ==/UserScript==
 
 (function() {
@@ -22,18 +26,19 @@
             
             // Initialize the assistant
             this.init();
-        }
-
-        // Default settings
+        }        // Default settings
         getDefaultSettings() {
             return {
                 ollama_model: "llama2",
                 rewrite_mode: "grammar",
                 persona_name: "Donald Trump",
+                custom_personas: [], // Store user-added personas
                 bionic_mode: false,
                 dark_mode: false,
                 auto_rewrite: false,
-                ollama_url: "http://localhost:11434"
+                ollama_url: "http://localhost:11434",
+                github_repo: "https://github.com/tootallderr/LLMTexter.git",
+                remote_config_url: "https://raw.githubusercontent.com/tootallderr/LLMTexter/main/config.json"
             };
         }
 
@@ -63,6 +68,8 @@
             this.applyTheme();
             this.applyBionicReading();
             await this.loadAvailableModels();
+            await this.loadRemoteConfig(); // Load config from GitHub if available
+            this.populateCustomPersonas();
         }
 
         // Inject CSS styles
@@ -271,12 +278,43 @@
                     color: #e74c3c;
                     font-size: 12px;
                     margin-top: 5px;
-                }
-
-                .llm-models-success {
+                }                .llm-models-success {
                     color: #27ae60;
                     font-size: 12px;
                     margin-top: 5px;
+                }
+
+                .llm-save-persona,
+                .llm-cancel-persona {
+                    flex: 1;
+                    padding: 8px 12px;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    cursor: pointer;
+                    transition: opacity 0.2s;
+                }
+
+                .llm-save-persona {
+                    background: #27ae60;
+                    color: white;
+                }
+
+                .llm-save-persona:hover {
+                    opacity: 0.9;
+                }
+
+                .llm-cancel-persona {
+                    background: #e74c3c;
+                    color: white;
+                }
+
+                .llm-cancel-persona:hover {
+                    opacity: 0.9;
+                }
+
+                #custom-persona-input {
+                    font-size: 14px;
                 }
 
                 .llm-status {
@@ -392,9 +430,7 @@
                             <option value="facts_only">Facts Only</option>
                             <option value="persona">Persona Imitation</option>
                         </select>
-                    </div>
-
-                    <div class="llm-setting-group" id="persona-group" style="display: none;">
+                    </div>                    <div class="llm-setting-group" id="persona-group" style="display: none;">
                         <label class="llm-setting-label">Persona</label>
                         <select class="llm-select" id="llm-persona">
                             <option value="Donald Trump">Donald Trump</option>
@@ -402,7 +438,15 @@
                             <option value="Barack Obama">Barack Obama</option>
                             <option value="Shakespeare">Shakespeare</option>
                             <option value="Yoda">Yoda</option>
+                            <option value="custom">Custom Persona...</option>
                         </select>
+                        <div id="custom-persona-group" style="display: none; margin-top: 10px;">
+                            <input type="text" class="llm-select" id="custom-persona-input" placeholder="Enter persona name (e.g., Steve Jobs, Einstein, etc.)" style="margin-bottom: 8px;">
+                            <div style="display: flex; gap: 8px;">
+                                <button class="llm-save-persona" id="save-persona">💾 Save</button>
+                                <button class="llm-cancel-persona" id="cancel-persona">❌ Cancel</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="llm-setting-group">
@@ -478,11 +522,13 @@
                 this.settings.rewrite_mode = e.target.value;
                 this.togglePersonaGroup();
                 this.saveSettings();
-            });
-
-            document.getElementById('llm-persona').addEventListener('change', (e) => {
-                this.settings.persona_name = e.target.value;
-                this.saveSettings();
+            });            document.getElementById('llm-persona').addEventListener('change', (e) => {
+                if (e.target.value === 'custom') {
+                    this.showCustomPersonaInput();
+                } else {
+                    this.settings.persona_name = e.target.value;
+                    this.saveSettings();
+                }
             });
 
             document.getElementById('auto-rewrite').addEventListener('change', (e) => {
@@ -501,10 +547,12 @@
                 this.applyTheme();
                 this.saveSettings();
             });            // Manual rewrite button
-            document.getElementById('manual-rewrite').addEventListener('click', () => this.manualRewrite());
-
-            // Refresh models button
+            document.getElementById('manual-rewrite').addEventListener('click', () => this.manualRewrite());            // Refresh models button
             document.getElementById('refresh-models').addEventListener('click', () => this.loadAvailableModels());
+
+            // Custom persona buttons
+            document.getElementById('save-persona').addEventListener('click', () => this.saveCustomPersona());
+            document.getElementById('cancel-persona').addEventListener('click', () => this.cancelCustomPersona());
 
             // Text area monitoring
             this.attachTextAreaListeners();
@@ -860,15 +908,136 @@
                     }
                 }, 3000);
             }
-        }
-
-        // Format file size for display
+        }        // Format file size for display
         formatSize(bytes) {
             if (bytes === 0) return '0 B';
             const k = 1024;
             const sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        // Show custom persona input
+        showCustomPersonaInput() {
+            document.getElementById('custom-persona-group').style.display = 'block';
+            document.getElementById('custom-persona-input').focus();
+        }
+
+        // Hide custom persona input
+        hideCustomPersonaInput() {
+            document.getElementById('custom-persona-group').style.display = 'none';
+            document.getElementById('custom-persona-input').value = '';
+        }
+
+        // Save custom persona
+        saveCustomPersona() {
+            const input = document.getElementById('custom-persona-input');
+            const personaName = input.value.trim();
+            
+            if (!personaName) {
+                this.showStatus('Please enter a persona name', 'error');
+                return;
+            }
+
+            // Add to custom personas list if not already there
+            if (!this.settings.custom_personas.includes(personaName)) {
+                this.settings.custom_personas.push(personaName);
+                this.saveSettings();
+                this.populateCustomPersonas();
+            }
+
+            // Set as current persona
+            this.settings.persona_name = personaName;
+            document.getElementById('llm-persona').value = personaName;
+            this.saveSettings();
+            this.hideCustomPersonaInput();
+            
+            this.showStatus(`Persona "${personaName}" saved!`, 'success');
+        }
+
+        // Cancel custom persona
+        cancelCustomPersona() {
+            this.hideCustomPersonaInput();
+            // Reset to previous selection
+            document.getElementById('llm-persona').value = this.settings.persona_name;
+        }
+
+        // Populate personas dropdown with custom ones
+        populateCustomPersonas() {
+            const personaSelect = document.getElementById('llm-persona');
+            const currentValue = personaSelect.value;
+            
+            // Keep default personas and add custom ones
+            const defaultPersonas = [
+                'Donald Trump', 'Elon Musk', 'Barack Obama', 'Shakespeare', 'Yoda'
+            ];
+            
+            // Clear and repopulate
+            personaSelect.innerHTML = '';
+            
+            // Add default personas
+            defaultPersonas.forEach(persona => {
+                const option = document.createElement('option');
+                option.value = persona;
+                option.textContent = persona;
+                personaSelect.appendChild(option);
+            });
+
+            // Add custom personas
+            this.settings.custom_personas.forEach(persona => {
+                const option = document.createElement('option');
+                option.value = persona;
+                option.textContent = `${persona} (Custom)`;
+                personaSelect.appendChild(option);
+            });
+
+            // Add "Custom Persona..." option
+            const customOption = document.createElement('option');
+            customOption.value = 'custom';
+            customOption.textContent = 'Add Custom Persona...';
+            personaSelect.appendChild(customOption);
+
+            // Restore selection
+            if (currentValue && currentValue !== 'custom') {
+                personaSelect.value = currentValue;
+            } else {
+                personaSelect.value = this.settings.persona_name;
+            }
+        }
+
+        // Load remote configuration from GitHub
+        async loadRemoteConfig() {
+            try {
+                const response = await fetch(this.settings.remote_config_url, {
+                    method: 'GET',
+                    cache: 'no-cache'
+                });
+
+                if (response.ok) {
+                    const remoteConfig = await response.json();
+                    
+                    // Merge remote config with local settings (local takes precedence)
+                    if (remoteConfig.settings) {
+                        // Only update if local setting doesn't exist or is default
+                        if (remoteConfig.settings.default_personas && 
+                            this.settings.custom_personas.length === 0) {
+                            this.settings.custom_personas = [...remoteConfig.settings.default_personas];
+                        }
+                        
+                        // Update prompt templates if available
+                        if (remoteConfig.settings.prompt_templates) {
+                            this.promptTemplates = { ...this.promptTemplates, ...remoteConfig.settings.prompt_templates };
+                        }
+                    }
+                    
+                    console.log('Remote config loaded successfully');
+                } else {
+                    console.log('Remote config not available, using local defaults');
+                }
+            } catch (error) {
+                console.log('Could not load remote config:', error.message);
+                // Continue with local settings - this is not a critical error
+            }
         }
     }
 

@@ -1,9 +1,10 @@
 {
   "name": "tampermonkey-llm-assistant",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Enhance browsing and writing with automatic text rewriting using LLMs via Ollama",
-  "author": "LLM Assistant Developer",
+  "author": "tootallderr",
   "license": "MIT",
+  "repository": "https://github.com/tootallderr/LLMTexter.git",
   "settings": {
     "default_model": "llama2",
     "default_mode": "grammar",
@@ -14,6 +15,19 @@
       "llava",
       "codellama"
     ],
+    "default_personas": [
+      "Steve Jobs",
+      "Albert Einstein", 
+      "Morgan Freeman",
+      "David Attenborough",
+      "Socrates"
+    ],
+    "prompt_templates": {
+      "grammar": "Fix grammar, spelling, and punctuation in the following text. Retain the original meaning and voice. Only return the corrected text:\n\n{text}",
+      "dont_lie": "Remove exaggerations, hyperbole, and speculation from the following statement. Make it more factual and accurate. Only return the revised text:\n\n{text}",
+      "facts_only": "Convert the following statement into an objective, factual tone. Remove opinions and emotional language. Only return the factual version:\n\n{text}",
+      "persona": "Rewrite the following text in the voice and style of {persona}. Match their tone and speaking patterns while keeping the same meaning and approximate length. Only return the rewritten text:\n\n{text}"
+    },
     "rewrite_modes": [
       {
         "id": "grammar",
@@ -35,13 +49,6 @@
         "name": "Persona Imitation",
         "description": "Rewrite in the style of selected personality"
       }
-    ],
-    "personas": [
-      "Donald Trump",
-      "Elon Musk", 
-      "Barack Obama",
-      "Shakespeare",
-      "Yoda"
     ]
   },
   "features": {
@@ -49,7 +56,9 @@
     "bionic_reading": true,
     "dark_mode": true,
     "keyboard_shortcuts": true,
-    "persistent_storage": true
+    "persistent_storage": true,
+    "custom_personas": true,
+    "remote_config": true
   },
   "shortcuts": {
     "manual_rewrite": "Ctrl+Shift+R",
