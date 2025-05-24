@@ -1,0 +1,62 @@
+{
+  "name": "tampermonkey-llm-assistant",
+  "version": "1.0.0",
+  "description": "Enhance browsing and writing with automatic text rewriting using LLMs via Ollama",
+  "author": "LLM Assistant Developer",
+  "license": "MIT",
+  "settings": {
+    "default_model": "llama2",
+    "default_mode": "grammar",
+    "ollama_endpoint": "http://localhost:11434",
+    "supported_models": [
+      "llama2",
+      "mistral", 
+      "llava",
+      "codellama"
+    ],
+    "rewrite_modes": [
+      {
+        "id": "grammar",
+        "name": "Grammar & Spelling",
+        "description": "Fix grammar, spelling, and punctuation while preserving meaning"
+      },
+      {
+        "id": "dont_lie", 
+        "name": "Don't Lie Mode",
+        "description": "Remove exaggerations, hyperbole, and speculation"
+      },
+      {
+        "id": "facts_only",
+        "name": "Facts Only", 
+        "description": "Convert to objective, factual tone"
+      },
+      {
+        "id": "persona",
+        "name": "Persona Imitation",
+        "description": "Rewrite in the style of selected personality"
+      }
+    ],
+    "personas": [
+      "Donald Trump",
+      "Elon Musk", 
+      "Barack Obama",
+      "Shakespeare",
+      "Yoda"
+    ]
+  },
+  "features": {
+    "auto_rewrite": true,
+    "bionic_reading": true,
+    "dark_mode": true,
+    "keyboard_shortcuts": true,
+    "persistent_storage": true
+  },
+  "shortcuts": {
+    "manual_rewrite": "Ctrl+Shift+R",
+    "toggle_panel": "Click brain icon"
+  },
+  "compatibility": {
+    "browsers": ["Chrome", "Firefox", "Edge", "Safari"],
+    "requires": ["Tampermonkey", "Ollama"]
+  }
+}

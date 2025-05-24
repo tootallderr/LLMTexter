@@ -1,164 +1,156 @@
 
+# 🧠 Tampermonkey LLM Assistant Roadmap
 
+## 🎯 Project Goal
 
-# LLMTexter Roadmap
+Enhance browsing and writing with automatic text rewriting using selected LLMs (via Ollama), activated contextually on textboxes. Provide user-friendly UI to configure and control behavior, including:
 
-## UI Improvements
+* Rewriting modes (grammar, factuality, persona mimicry, etc.)
+* Bionic Reading Mode
+* Persistent model and settings storage
+* Light/Dark theme toggle
 
-- [] **Dark Mode**
-  -  Add theme toggle functionality (Alt+T)
-  -  Create a consistent dark color palette
+---
 
-- [] **Accessibility Enhancements**
-  -  Improve screen reader compatibility with ARIA labels
-  -  Add keyboard shortcuts for common actions
+## 📁 Project Structure
 
-- [] **Bionic Reading Mode**
-  -  Implement text parsing algorithm to highlight letter patterns
-  -  Add toggle button in the UI toolbar (Alt+B)
-  -  Create customization options for highlight intensity
-  -  Support different languages and character sets
-  -  Add animation transitions for enabling/disabling mode
+```
+tampermonkey-llm-assistant/
+├── script.user.js         # Main Tampermonkey script
+├── ui.html                # Settings/config HTML
+├── styles.css             # Custom styles
+├── utils.js               # Utilities for storage, DOM, debounce, etc.
+├── ollama.js              # Ollama API interfacing
+├── config.json            # Optional remote defaults
+└── README.md              # Project docs
+```
 
-- [] **User Customization**
-  -  Allow users to customize the UI layout
-  -  Add personalized settings for text size and font preferences
+---
 
+## 🛠️ Development Phases
 
+### Phase 1: 📦 Basic Setup
 
+* [ ] Initialize Tampermonkey script
+* [ ] Inject custom UI into page (fixed icon/button bottom right)
+* [ ] Toggle UI open/close
 
+---
 
+### Phase 2: ⚙️ Settings Panel (Persistent)
 
-## Performance Optimizations
+* [ ] Save & load settings to `localStorage`
+* [ ] Select Ollama model (dropdown w/ examples: `mistral`, `llama2`, `llava`)
+* [ ] Toggle switches:
 
-- [ ] **Backend Efficiency**
-  - Implement request batching for LLM queries
-  - Add caching layer for frequent responses
+  * [ ] "Auto Rewrite Input"
+  * [ ] "Bionic Reading Mode"
+  * [ ] "Dark Mode"
 
-- [ ] **Frontend Optimization**
-  - Reduce JavaScript bundle size
-  - Implement lazy loading for non-critical components
+---
 
-- [ ] **Synchronization Improvements**
-  - Optimize GitHub sync process
-  - Add selective sync options for large repositories
+### Phase 3: ✍️ Rewrite Engine
 
-## LLM Integration Enhancements
+* [ ] Detect focus on `<input>` or `<textarea>`
+* [ ] Monitor and intercept user text before sending
+* [ ] Apply selected LLM rewrite mode:
 
-- [ ] **Multimedia Processing**
-  - Support for video content analysis and summarization
-  - Enable image recognition and description capabilities
+  * [ ] ✅ Spelling & Grammar
+  * [ ] ✅ Don’t Lie Mode (filter exaggeration)
+  * [ ] ✅ Only Facts Mode (informational tone)
+  * [ ] ✅ Imitate Persona (e.g., Trump, Elon Musk, Obama)
 
-- [ ] **Browser Extension Features**
-  - Add context-aware content suggestions
-  - Implement real-time webpage analysis
+    * Use prompt formatting:
+      `"Rewrite this as if spoken by {persona}, keeping same tone/length"`
+* [ ] Enforce length limits (e.g., +10-15% max)
+* [ ] Replace input field text with modified version
 
-- [ ] **Advanced LLM Utilization**
-  - Implement multi-modal interactions (text + image input)
-  - Create specialized modes for different content types (code, academic, creative)
+---
 
+### Phase 4: 🧠 Ollama LLM Integration
 
+* [ ] Interface with local Ollama API
+* [ ] Allow model selection via UI
+* [ ] Inject prompt & input to Ollama, receive response
+* [ ] Handle timeouts/errors gracefully
+* [ ] Optionally queue prompts
 
+---
 
+### Phase 5: 👓 Bionic Reading Mode
 
+* [ ] Toggle Bionic Reading via CSS: `<b>bold</b> first part of each word`
+* [ ] Apply on page load or on-demand
+* [ ] Respect user's dark/light preference
 
+---
 
+### Phase 6: 🌙 Dark/Light Mode
 
-## Video Captioning and Translation Feature
+* [ ] Add dark/light toggle in settings
+* [ ] Store preference in `localStorage`
+* [ ] Apply corresponding CSS themes
 
-### Overview
+---
 
-Implement a feature that uses local LLMs to generate, enhance, and translate video captions. This would work alongside Whisper for initial transcription and use the rewriting modes to process captions.
+### Phase 7: 🚀 Usability Polish
 
-### Implementation Plan
+* [ ] Add hotkey support (e.g., `Ctrl+Shift+R` to manually rewrite)
+* [ ] Optionally add toolbar tooltip on hover
+* [ ] Support feedback log (for debugging/usage)
 
-1. **Speech Recognition Integration**
-   - Integrate with Whisper API for accurate initial transcription
-   - Process video in 30-second chunks for manageable processing
-   - Add option to use alternative speech recognition APIs
+---
 
-2. **Caption Buffer System**
-   - Create a buffer system that pauses video when needed
-   - Pre-process chunks of audio/video ahead of playback
-   - Maintain at least 30 seconds of processed captions in the buffer
-   - Resume playback once sufficient buffer is established
+## 💡 Sample LLM Prompts
 
-3. **Caption Processing Modes**
-   - "Summarize" - condense lengthy dialogues
-   - "Simplify" - make complex language more accessible
-   - "Formalize" - make casual speech more formal
-   - "Translate" - convert captions to different languages
-   - "Fix Grammar" - correct transcription errors and grammar
-   - "Creative" - add dramatic or humorous elements to captions
+```markdown
+## Persona Prompt
+"Rewrite the following text in the voice of {persona}. Match tone and length. Be concise."
+Input: "Hey, let’s catch up later!"
+→ "Believe me, we’re gonna have a fantastic time—later!"
 
-4. **User Interface Enhancements**
-   - Add caption controls to video player interface
-   - Create settings for caption style, timing, and processing preferences
-   - Provide visual indicator for buffer status
+## Don't Lie Mode
+"Remove exaggerations, hyperbole or speculation from this statement."
 
-5. **Synchronization System**
-   - Develop timestamp matching to ensure captions align with video
-   - Allow for adjustable delay/advance of captions
-   - Handle varying processing times for different caption modes
+## Only Facts Mode
+"Convert the following statement into an objective factual tone."
 
-6. **Performance Optimizations**
-   - Implement background processing while video plays
-   - Add option to pre-process entire video before watching
-   - Create caching system for previously processed videos
+## Grammar Fix
+"Fix grammar, spelling, and punctuation. Retain meaning and voice."
+```
 
-7. **Export Functionality**
-   - Allow export of processed captions as SRT/VTT files
-   - Enable batch processing of multiple videos
-   - Support sharing captions between users
+---
 
-### Technical Considerations
+## 🧰 Persistent Storage Schema (`localStorage`)
 
-- Balancing caption accuracy with processing speed
-- Handling processing delays with longer videos
-- Managing resource usage on client machines
-- Ensuring proper synchronization between video and captions
+```json
+{
+  "ollama_model": "llama2",
+  "rewrite_mode": "persona",
+  "persona_name": "Donald Trump",
+  "bionic_mode": true,
+  "dark_mode": false,
+  "auto_rewrite": true
+}
+```
 
-### Future Enhancements
+---
 
-- Multi-language support for UI and captions
-- Custom templates for different video types (lectures, movies, etc.)
-- Voice-matching for multi-speaker videos
-- Integration with popular video platforms
+## 🔐 Privacy and Ethics Notes
 
-## Timeline
+* No data is sent externally without user config
+* Rewrites should always preserve meaning and tone unless configured otherwise
+* Avoid impersonation of real people unless used responsibly (e.g., parody)
 
-### Phase 1: Core Features (Q1 2024)
--  Basic text rewriting functionality
--  Dark mode and accessibility features
--  Bionic reading implementation
-- [ ] Initial performance optimizations
+---
 
-### Phase 2: Enhanced LLM Integration (Q2 2024)
-- [ ] Backend efficiency improvements
-- [ ] Multi-modal input support
-- [ ] Context-aware suggestions
-- [ ] Real-time webpage analysis
+## 📝 TODO List
 
-### Phase 3: Video Features (Q3 2024)
-- [ ] Speech recognition integration
-- [ ] Basic caption processing
-- [ ] Video player controls
-- [ ] Caption synchronization system
+* [ ] Create base UI
+* [ ] Build Ollama prompt formatter
+* [ ] Connect textarea watcher
+* [ ] Integrate rewrite + LLM
+* [ ] Style everything with Tailwind/CSS
+* [ ] Add settings backup/export
 
-### Phase 4: Advanced Features (Q4 2024)
-- [ ] Multi-language support
-- [ ] Advanced caption processing modes
-- [ ] Export functionality
-- [ ] Performance optimizations
-
-### Phase 5: Platform Integration (Q1 2025)
-- [ ] Popular platform integrations
-- [ ] Browser extension features
-- [ ] API improvements
-- [ ] Community features
-
-### Maintenance and Updates
-- Continuous bug fixes and improvements
-- Regular LLM model updates
-- Performance monitoring and optimization
-- Security patches and updates
+---
