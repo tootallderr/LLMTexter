@@ -453,6 +453,14 @@
                     <button class="llm-assistant-close">×</button>
                 </div>
                 <div class="llm-assistant-content">                    <div class="llm-setting-group">
+                        <label class="llm-setting-label">Ollama URL</label>
+                        <input type="text" class="llm-select" id="ollama-url" placeholder="http://localhost:11434" style="font-family: monospace;">
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">
+                            Change if Ollama runs on different port/host
+                        </div>
+                    </div>
+
+                    <div class="llm-setting-group">
                         <label class="llm-setting-label">Ollama Model</label>
                         <select class="llm-select" id="llm-model">
                             <option value="">Loading models...</option>
@@ -528,6 +536,7 @@
         }        // Load settings into UI
         loadUISettings() {
             // Model will be set after loading available models
+            document.getElementById('ollama-url').value = this.settings.ollama_url;
             document.getElementById('llm-rewrite-mode').value = this.settings.rewrite_mode;
             document.getElementById('llm-persona').value = this.settings.persona_name;
             document.getElementById('auto-rewrite').checked = this.settings.auto_rewrite;
@@ -550,9 +559,14 @@
             this.toggleButton.addEventListener('click', () => this.togglePanel());
 
             // Close button
-            this.panel.querySelector('.llm-assistant-close').addEventListener('click', () => this.closePanel());
+            this.panel.querySelector('.llm-assistant-close').addEventListener('click', () => this.closePanel());            // Settings changes
+            document.getElementById('ollama-url').addEventListener('change', (e) => {
+                this.settings.ollama_url = e.target.value.trim() || 'http://localhost:11434';
+                this.saveSettings();
+                // Auto-refresh models when URL changes
+                this.loadAvailableModels();
+            });
 
-            // Settings changes
             document.getElementById('llm-model').addEventListener('change', (e) => {
                 this.settings.ollama_model = e.target.value;
                 this.saveSettings();
@@ -796,32 +810,57 @@
             };
 
             return prompts[mode] || prompts.grammar;
-        }
-
-        // Call Ollama API
+        }        // Call Ollama API
         async callOllama(prompt) {
-            const response = await fetch(`${this.settings.ollama_url}/api/generate`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: this.settings.ollama_model,
-                    prompt: prompt,
-                    stream: false,
-                    options: {
-                        temperature: 0.7,
-                        max_tokens: 1000
-                    }
-                })
-            });
+            console.log('Calling Ollama with model:', this.settings.ollama_model);
+            console.log('Prompt length:', prompt.length);
+            
+            try {
+                const response = await fetch(`${this.settings.ollama_url}/api/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    mode: 'cors',
+                    body: JSON.stringify({
+                        model: this.settings.ollama_model,
+                        prompt: prompt,
+                        stream: false,
+                        options: {
+                            temperature: 0.7,
+                            num_predict: 1000
+                        }
+                    })
+                });
 
-            if (!response.ok) {
-                throw new Error(`Ollama API error: ${response.status}`);
+                console.log('Ollama response status:', response.status);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('Ollama error response:', errorText);
+                    throw new Error(`Ollama API error: ${response.status} - ${errorText}`);
+                }
+
+                const data = await response.json();
+                console.log('Ollama response data:', data);
+                
+                if (!data.response) {
+                    throw new Error('No response from Ollama');
+                }
+
+                return data.response.trim();
+                
+            } catch (error) {
+                console.error('Ollama API call failed:', error);
+                
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    throw new Error('Cannot connect to Ollama. Make sure Ollama is running with "ollama serve"');
+                } else if (error.message.includes('model')) {
+                    throw new Error(`Model "${this.settings.ollama_model}" not found. Try installing it with "ollama pull ${this.settings.ollama_model}"`);
+                } else {
+                    throw error;
+                }
             }
-
-            const data = await response.json();
-            return data.response?.trim() || '';
         }
 
         // Get text from element
@@ -877,9 +916,7 @@
         debounce(func, wait) {
             clearTimeout(this.debounceTimer);
             this.debounceTimer = setTimeout(func, wait);
-        }
-
-        // Load available models from Ollama
+        }        // Load available models from Ollama
         async loadAvailableModels() {
             const modelSelect = document.getElementById('llm-model');
             const refreshButton = document.getElementById('refresh-models');
@@ -896,18 +933,41 @@
             }
 
             try {
+                console.log('Attempting to connect to Ollama at:', this.settings.ollama_url);
+                
+                // First try to check if Ollama is running
+                const healthResponse = await fetch(`${this.settings.ollama_url}/api/version`, {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    mode: 'cors'
+                });
+
+                console.log('Health check response:', healthResponse.status);
+
+                if (!healthResponse.ok) {
+                    throw new Error(`Ollama not responding (status: ${healthResponse.status})`);
+                }
+
+                // Now get the models
                 const response = await fetch(`${this.settings.ollama_url}/api/tags`, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
-                    }
+                    },
+                    mode: 'cors'
                 });
 
+                console.log('Models API response:', response.status);
+
                 if (!response.ok) {
-                    throw new Error(`Ollama API error: ${response.status}`);
+                    throw new Error(`Models API error: ${response.status} - ${response.statusText}`);
                 }
 
                 const data = await response.json();
+                console.log('Models data:', data);
+                
                 const models = data.models || [];
 
                 // Clear and populate model dropdown
@@ -915,12 +975,13 @@
 
                 if (models.length === 0) {
                     modelSelect.innerHTML = '<option value="">No models found</option>';
-                    this.showModelStatus('No models found. Please install models using "ollama pull <model-name>"', 'error');
+                    this.showModelStatus('No models installed. Run "ollama pull <model-name>" to install models.', 'error');
                 } else {
                     models.forEach(model => {
                         const option = document.createElement('option');
                         option.value = model.name;
-                        option.textContent = `${model.name} (${this.formatSize(model.size)})`;
+                        const sizeText = model.size ? ` (${this.formatSize(model.size)})` : '';
+                        option.textContent = `${model.name}${sizeText}`;
                         modelSelect.appendChild(option);
                     });
 
@@ -937,13 +998,40 @@
                         this.saveSettings();
                     }
 
-                    this.showModelStatus(`Found ${models.length} model(s)`, 'success');
+                    this.showModelStatus(`✅ Found ${models.length} model(s). Ollama is running!`, 'success');
                 }
 
             } catch (error) {
                 console.error('Failed to load models:', error);
-                modelSelect.innerHTML = '<option value="">Failed to load models</option>';
-                this.showModelStatus(`Error: ${error.message}. Make sure Ollama is running.`, 'error');
+                modelSelect.innerHTML = '';
+                
+                // Add common fallback models
+                const fallbackModels = ['llama3.1', 'llama3', 'llama2', 'mistral', 'phi3', 'codellama'];
+                fallbackModels.forEach(modelName => {
+                    const option = document.createElement('option');
+                    option.value = modelName;
+                    option.textContent = `${modelName} (manual entry)`;
+                    modelSelect.appendChild(option);
+                });
+
+                // Show detailed error message
+                let errorMsg = '❌ Cannot connect to Ollama. ';
+                
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    errorMsg += 'Is Ollama running? Try: "ollama serve"';
+                } else if (error.message.includes('CORS')) {
+                    errorMsg += 'CORS issue - this is normal in browsers.';
+                } else {
+                    errorMsg += error.message;
+                }
+                
+                errorMsg += '\n\nTroubleshooting:\n';
+                errorMsg += '1. Make sure Ollama is running: "ollama serve"\n';
+                errorMsg += '2. Check if models are installed: "ollama list"\n';
+                errorMsg += '3. Try manually selecting a model from the dropdown\n';
+                errorMsg += `4. Verify Ollama URL: ${this.settings.ollama_url}`;
+                
+                this.showModelStatus(errorMsg, 'error');
             } finally {
                 refreshButton.disabled = false;
                 refreshButton.textContent = '🔄 Refresh Models';
