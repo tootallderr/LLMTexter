@@ -67,7 +67,7 @@
             this.createUI();
             this.attachEventListeners();
             this.applyTheme();
-            this.applyBionicReading();
+            this.setupBionicReading();
             await this.loadAvailableModels();
             await this.loadRemoteConfig(); // Load config from GitHub if available
             this.populateCustomPersonas();
@@ -361,15 +361,23 @@
 
                 .llm-dark .llm-toggle {
                     border-bottom-color: #34495e;
-                }
-
-                /* Bionic Reading Styles */
+                }                /* Bionic Reading Styles */
                 .bionic-reading {
                     font-family: inherit !important;
+                    font-size: inherit !important;
+                    line-height: inherit !important;
+                    color: inherit !important;
                 }
 
                 .bionic-reading b {
                     font-weight: bold !important;
+                    color: inherit !important;
+                    background: none !important;
+                }
+
+                /* Dark mode bionic reading */
+                .llm-dark .bionic-reading b {
+                    color: inherit !important;
                 }
 
                 /* Processing indicator */
@@ -588,11 +596,9 @@
             document.getElementById('auto-rewrite').addEventListener('change', (e) => {
                 this.settings.auto_rewrite = e.target.checked;
                 this.saveSettings();
-            });
-
-            document.getElementById('bionic-mode').addEventListener('change', (e) => {
+            });            document.getElementById('bionic-mode').addEventListener('change', (e) => {
                 this.settings.bionic_mode = e.target.checked;
-                this.applyBionicReading();
+                this.toggleBionicReading();
                 this.saveSettings();
             });
 
@@ -678,33 +684,143 @@
         closePanel() {
             this.isOpen = false;
             this.panel.classList.remove('open');
-        }
-
-        // Apply theme
+        }        // Apply theme
         applyTheme() {
             document.body.classList.toggle('llm-dark', this.settings.dark_mode);
         }
 
-        // Apply bionic reading
-        applyBionicReading() {
+        // Setup bionic reading with observers
+        setupBionicReading() {
+            this.bionicObserver = null;
+            this.processedNodes = new WeakSet();
+            
             if (this.settings.bionic_mode) {
-                this.makeBionicReading();
-            } else {
-                this.removeBionicReading();
+                this.enableBionicReading();
             }
         }
 
-        // Make text bionic readable
-        makeBionicReading() {
-            const textNodes = this.getTextNodes(document.body);
+        // Toggle bionic reading
+        toggleBionicReading() {
+            if (this.settings.bionic_mode) {
+                this.enableBionicReading();
+            } else {
+                this.disableBionicReading();
+            }
+        }
+
+        // Enable bionic reading
+        enableBionicReading() {
+            // Process existing content
+            this.processBionicReading(document.body);
+            
+            // Set up observer for new content
+            if (!this.bionicObserver) {
+                this.bionicObserver = new MutationObserver((mutations) => {
+                    mutations.forEach((mutation) => {
+                        mutation.addedNodes.forEach((node) => {
+                            if (node.nodeType === Node.ELEMENT_NODE && !this.processedNodes.has(node)) {
+                                // Skip our own UI elements
+                                if (!node.closest('.llm-assistant-panel, .llm-floating-rewrite, .llm-processing-indicator')) {
+                                    this.processBionicReading(node);
+                                }
+                            }
+                        });
+                    });
+                });
+
+                this.bionicObserver.observe(document.body, {
+                    childList: true,
+                    subtree: true
+                });
+            }
+
+            // Handle page navigation (for SPAs)
+            this.setupNavigationListener();
+        }
+
+        // Disable bionic reading
+        disableBionicReading() {
+            // Remove all bionic formatting
+            this.removeBionicReading();
+            
+            // Stop observing
+            if (this.bionicObserver) {
+                this.bionicObserver.disconnect();
+                this.bionicObserver = null;
+            }
+            
+            // Clear processed nodes
+            this.processedNodes = new WeakSet();
+        }
+
+        // Setup navigation listener for SPAs
+        setupNavigationListener() {
+            // Listen for URL changes (for single-page applications)
+            let currentUrl = window.location.href;
+            
+            const checkForNavigation = () => {
+                if (window.location.href !== currentUrl) {
+                    currentUrl = window.location.href;
+                    if (this.settings.bionic_mode) {
+                        // Delay to allow page content to load
+                        setTimeout(() => {
+                            this.processBionicReading(document.body);
+                        }, 500);
+                    }
+                }
+            };
+
+            // Check for URL changes
+            setInterval(checkForNavigation, 1000);
+            
+            // Listen for popstate (back/forward navigation)
+            window.addEventListener('popstate', () => {
+                if (this.settings.bionic_mode) {
+                    setTimeout(() => {
+                        this.processBionicReading(document.body);
+                    }, 500);
+                }
+            });
+        }
+
+        // Process bionic reading for a container
+        processBionicReading(container) {
+            if (!this.settings.bionic_mode || this.processedNodes.has(container)) {
+                return;
+            }
+
+            // Mark as processed
+            this.processedNodes.add(container);
+
+            const textNodes = this.getTextNodes(container);
             textNodes.forEach(node => {
-                if (!node.parentElement.closest('.llm-assistant-panel')) {
-                    const bionicText = this.convertToBionic(node.textContent);
-                    if (bionicText !== node.textContent) {
-                        const span = document.createElement('span');
-                        span.innerHTML = bionicText;
-                        span.className = 'bionic-reading';
+                // Skip if already processed or in our UI
+                if (node.parentElement.closest('.llm-assistant-panel, .llm-floating-rewrite, .llm-processing-indicator, .bionic-reading')) {
+                    return;
+                }
+
+                // Skip script and style elements
+                if (node.parentElement.matches('script, style, noscript')) {
+                    return;
+                }
+
+                // Skip very short text or whitespace-only
+                const text = node.textContent.trim();
+                if (text.length < 3) {
+                    return;
+                }
+
+                const bionicText = this.convertToBionic(text);
+                if (bionicText !== text) {
+                    const span = document.createElement('span');
+                    span.innerHTML = bionicText;
+                    span.className = 'bionic-reading';
+                    
+                    try {
                         node.parentElement.replaceChild(span, node);
+                    } catch (e) {
+                        // Skip if replacement fails (element might be readonly)
+                        console.debug('Could not apply bionic reading to element:', e);
                     }
                 }
             });
@@ -717,24 +833,46 @@
                 const textNode = document.createTextNode(element.textContent);
                 element.parentElement.replaceChild(textNode, element);
             });
-        }
-
-        // Convert text to bionic format
+        }        // Convert text to bionic format
         convertToBionic(text) {
             return text.replace(/\b(\w+)\b/g, (word) => {
-                if (word.length <= 2) return word;
+                if (word.length <= 1) return word;
+                
+                // Calculate split point (first half gets bold)
                 const splitPoint = Math.ceil(word.length / 2);
-                return `<b>${word.substring(0, splitPoint)}</b>${word.substring(splitPoint)}`;
+                const firstPart = word.substring(0, splitPoint);
+                const secondPart = word.substring(splitPoint);
+                
+                return `<b>${firstPart}</b>${secondPart}`;
             });
         }
 
-        // Get all text nodes
+        // Get all text nodes efficiently
         getTextNodes(element) {
             const textNodes = [];
             const walker = document.createTreeWalker(
                 element,
                 NodeFilter.SHOW_TEXT,
-                node => node.textContent.trim() !== '' ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT
+                {
+                    acceptNode: (node) => {
+                        // Skip empty or whitespace-only nodes
+                        if (!node.textContent.trim()) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        
+                        // Skip our UI elements
+                        if (node.parentElement.closest('.llm-assistant-panel, .llm-floating-rewrite, .llm-processing-indicator')) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        
+                        // Skip script/style elements
+                        if (node.parentElement.matches('script, style, noscript')) {
+                            return NodeFilter.FILTER_REJECT;
+                        }
+                        
+                        return NodeFilter.FILTER_ACCEPT;
+                    }
+                }
             );
 
             let node;
