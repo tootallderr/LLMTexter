@@ -17,16 +17,17 @@
     'use strict';
 
     // Configuration and State Management
-    class LLMAssistant {
-        constructor() {
+    class LLMAssistant {        constructor() {
             this.isOpen = false;
             this.settings = this.loadSettings();
             this.activeElement = null;
             this.isProcessing = false;
+            this.floatingButton = null;
+            this.hideButtonTimeout = null;
             
             // Initialize the assistant
             this.init();
-        }        // Default settings
+        }// Default settings
         getDefaultSettings() {
             return {
                 ollama_model: "llama2",
@@ -383,11 +384,50 @@
                     font-size: 14px;
                     z-index: 10002;
                     animation: pulse 1.5s ease-in-out infinite alternate;
-                }
-
-                @keyframes pulse {
+                }                @keyframes pulse {
                     from { opacity: 0.7; }
                     to { opacity: 1; }
+                }
+
+                /* Floating rewrite button */
+                .llm-floating-rewrite {
+                    position: absolute;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 20px;
+                    padding: 8px 16px;
+                    font-size: 12px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    z-index: 10003;
+                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+                    transition: all 0.2s ease;
+                    opacity: 0;
+                    transform: translateY(10px);
+                    pointer-events: none;
+                    white-space: nowrap;
+                }
+
+                .llm-floating-rewrite.show {
+                    opacity: 1;
+                    transform: translateY(0);
+                    pointer-events: all;
+                }
+
+                .llm-floating-rewrite:hover {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+                }
+
+                .llm-floating-rewrite:active {
+                    transform: translateY(0);
+                }
+
+                /* Highlight active text field */
+                .llm-active-field {
+                    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.3) !important;
+                    transition: box-shadow 0.2s ease !important;
                 }
             `;
 
@@ -571,14 +611,20 @@
                     this.closePanel();
                 }
             });
-        }
-
-        // Attach listeners to text areas and inputs
+        }        // Attach listeners to text areas and inputs
         attachTextAreaListeners() {
             document.addEventListener('focusin', (e) => {
-                if (e.target.matches('textarea, input[type="text"], [contenteditable="true"]')) {
-                    this.activeElement = e.target;
+                if (e.target.matches('textarea, input[type="text"], input[type="email"], input[type="search"], [contenteditable="true"]')) {
+                    this.setActiveElement(e.target);
                 }
+            });
+
+            document.addEventListener('focusout', (e) => {
+                // Delay hiding to allow clicking the floating button
+                this.hideButtonTimeout = setTimeout(() => {
+                    this.hideFloatingButton();
+                    this.clearActiveElement();
+                }, 200);
             });
 
             document.addEventListener('keydown', (e) => {
@@ -586,6 +632,25 @@
                     (e.key === 'Enter' || e.key === 'Tab')) {
                     this.debounce(() => this.autoRewrite(), 300);
                 }
+            });
+
+            // Handle dynamic content
+            const observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    mutation.addedNodes.forEach((node) => {
+                        if (node.nodeType === 1) { // Element node
+                            const textFields = node.querySelectorAll?.('textarea, input[type="text"], input[type="email"], input[type="search"], [contenteditable="true"]');
+                            textFields?.forEach(field => {
+                                // Already handled by event delegation
+                            });
+                        }
+                    });
+                });
+            });
+
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
             });
         }
 
@@ -1003,9 +1068,7 @@
             } else {
                 personaSelect.value = this.settings.persona_name;
             }
-        }
-
-        // Load remote configuration from GitHub
+        }        // Load remote configuration from GitHub
         async loadRemoteConfig() {
             try {
                 const response = await fetch(this.settings.remote_config_url, {
@@ -1038,6 +1101,150 @@
                 console.log('Could not load remote config:', error.message);
                 // Continue with local settings - this is not a critical error
             }
+        }
+
+        // Set active element and show floating button
+        setActiveElement(element) {
+            // Clear any existing timeout
+            if (this.hideButtonTimeout) {
+                clearTimeout(this.hideButtonTimeout);
+                this.hideButtonTimeout = null;
+            }
+
+            // Skip if it's our own UI elements
+            if (element.closest('.llm-assistant-panel') || element.closest('.llm-floating-rewrite')) {
+                return;
+            }
+
+            this.activeElement = element;
+            this.highlightActiveField(element);
+            this.showFloatingButton(element);
+        }
+
+        // Clear active element
+        clearActiveElement() {
+            if (this.activeElement) {
+                this.removeHighlight(this.activeElement);
+                this.activeElement = null;
+            }
+        }
+
+        // Highlight the active text field
+        highlightActiveField(element) {
+            // Remove existing highlights
+            document.querySelectorAll('.llm-active-field').forEach(el => {
+                el.classList.remove('llm-active-field');
+            });
+            
+            // Add highlight to current element
+            element.classList.add('llm-active-field');
+        }
+
+        // Remove highlight from element
+        removeHighlight(element) {
+            element.classList.remove('llm-active-field');
+        }
+
+        // Show floating rewrite button
+        showFloatingButton(element) {
+            // Remove existing button
+            this.hideFloatingButton();
+
+            // Create floating button
+            this.floatingButton = document.createElement('button');
+            this.floatingButton.className = 'llm-floating-rewrite';
+            
+            // Get the current mode for the button text
+            const modeText = this.getModeDisplayText();
+            this.floatingButton.innerHTML = `✨ Rewrite (${modeText})`;
+            
+            // Position the button
+            this.positionFloatingButton(element);
+            
+            // Add click handler
+            this.floatingButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.quickRewrite();
+            });
+
+            // Prevent losing focus when clicking button
+            this.floatingButton.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+            });
+
+            document.body.appendChild(this.floatingButton);
+
+            // Show with animation
+            setTimeout(() => {
+                this.floatingButton.classList.add('show');
+            }, 10);
+        }
+
+        // Get display text for current mode
+        getModeDisplayText() {
+            const modes = {
+                'grammar': 'Grammar',
+                'dont_lie': 'No Lies',
+                'facts_only': 'Facts',
+                'persona': this.settings.persona_name || 'Persona'
+            };
+            return modes[this.settings.rewrite_mode] || 'Rewrite';
+        }
+
+        // Position floating button near the element
+        positionFloatingButton(element) {
+            const rect = element.getBoundingClientRect();
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+            
+            // Position above the element by default
+            let top = rect.top + scrollTop - 40;
+            let left = rect.left + scrollLeft + 10;
+            
+            // Adjust if button would be off-screen
+            if (top < scrollTop + 10) {
+                top = rect.bottom + scrollTop + 10; // Position below instead
+            }
+            
+            if (left + 150 > window.innerWidth + scrollLeft) {
+                left = rect.right + scrollLeft - 150; // Position on the right edge
+            }
+            
+            this.floatingButton.style.top = `${top}px`;
+            this.floatingButton.style.left = `${left}px`;
+        }
+
+        // Hide floating button
+        hideFloatingButton() {
+            if (this.floatingButton) {
+                this.floatingButton.classList.remove('show');
+                setTimeout(() => {
+                    if (this.floatingButton && this.floatingButton.parentNode) {
+                        this.floatingButton.parentNode.removeChild(this.floatingButton);
+                    }
+                    this.floatingButton = null;
+                }, 200);
+            }
+        }
+
+        // Quick rewrite function
+        async quickRewrite() {
+            if (!this.activeElement) {
+                this.showStatus('No text field selected', 'error');
+                return;
+            }
+
+            const text = this.getElementText(this.activeElement);
+            if (!text.trim()) {
+                this.showStatus('No text to rewrite', 'error');
+                return;
+            }
+
+            // Hide the floating button during processing
+            this.hideFloatingButton();
+            
+            await this.rewriteText(text, this.activeElement);
         }
     }
 
